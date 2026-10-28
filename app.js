@@ -84,7 +84,14 @@ function loadGhConfig() {
     const raw = localStorage.getItem(GH_SYNC_STORAGE_KEY);
     if (!raw) return null;
     const cfg = JSON.parse(raw);
-    if (cfg && cfg.repo && cfg.token) return cfg;
+    if (cfg && cfg.repo && cfg.token) {
+      // Safeguard: never use the public "notenbuch" app shell repo for data; always use "notenbuch-daten"
+      if (cfg.repo.toLowerCase().endsWith('/notenbuch')) {
+        cfg.repo = `${cfg.repo}-daten`;
+        localStorage.setItem(GH_SYNC_STORAGE_KEY, JSON.stringify(cfg));
+      }
+      return cfg;
+    }
   } catch (_) {}
   return null;
 }
@@ -107,7 +114,7 @@ function detectRepoFromGithubPagesUrl() {
     const owner = host.replace('.github.io', '');
     return `${owner}/notenbuch-daten`;
   }
-  return '';
+  return 'tarikidi/notenbuch-daten';
 }
 
 function updateSyncBadgeUi() {
@@ -1469,7 +1476,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('sync-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const repo = document.getElementById('gh-repo-input').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
+    let repo = document.getElementById('gh-repo-input').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
+    if (repo.toLowerCase().endsWith('/notenbuch')) {
+      repo = `${repo}-daten`;
+      document.getElementById('gh-repo-input').value = repo;
+    }
     const branch = document.getElementById('gh-branch-input').value.trim() || 'main';
     const token = document.getElementById('gh-token-input').value.trim();
     const statusEl = document.getElementById('sync-form-status');
