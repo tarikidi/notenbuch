@@ -178,8 +178,12 @@ const server = http.createServer(async (req, res) => {
       writeDb({
         students: data.students || [],
         subjects: data.subjects,
-        grades: data.grades
+        grades: data.grades,
+        logs: data.logs || []
       });
+      if (typeof data.csv === 'string') {
+        fs.writeFileSync(path.join(DATA_DIR, 'changelog.csv'), data.csv, 'utf8');
+      }
       return sendJson(res, 200, { ok: true });
     }
 

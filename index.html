@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body>
   <div class="app-container">
@@ -68,6 +68,35 @@
     <main id="subjects-list" class="subjects-list" aria-label="Fächerübersicht">
       <!-- Rendered dynamically by app.js -->
     </main>
+
+    <!-- Changelog / Backup History Panel (per Child) -->
+    <section id="changelog-card" class="changelog-card" aria-label="Änderungsprotokoll und Backup">
+      <button type="button" id="changelog-toggle-btn" class="changelog-header" aria-expanded="false">
+        <div class="changelog-header-left">
+          <span class="changelog-icon" aria-hidden="true">🛡️</span>
+          <div>
+            <span class="changelog-title">Änderungsprotokoll &amp; Backup</span>
+            <span id="changelog-count" class="changelog-subtitle">0 Einträge</span>
+          </div>
+        </div>
+        <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+
+      <div id="changelog-body" class="changelog-body">
+        <div class="changelog-toolbar">
+          <span class="changelog-hint">Alle Änderungen werden automatisch in <code>notenbuch-daten</code> (JSON &amp; CSV) gesichert.</span>
+          <div class="changelog-export-btns">
+            <button type="button" id="btn-export-csv" class="btn btn-secondary btn-sm" title="Protokoll als CSV herunterladen">⬇ CSV</button>
+            <button type="button" id="btn-export-json" class="btn btn-secondary btn-sm" title="Komplettes Backup als JSON herunterladen">⬇ JSON</button>
+          </div>
+        </div>
+        <div id="changelog-list" class="changelog-list">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+      </div>
+    </section>
 
     <footer id="lan-info-banner" class="lan-info-banner hidden">
       <span>📱 Smartphone im WLAN:</span>
@@ -331,6 +360,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

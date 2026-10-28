@@ -68,6 +68,8 @@ const state = {
   activeStudentId: 'student-1',
   subjects: [],
   grades: [],
+  logs: [],
+  changelogExpanded: false,
   lanUrls: [],
   expandedSubjectIds: new Set(),
   storageMode: 'idb', // 'github' | 'server' | 'idb'
@@ -130,12 +132,54 @@ function normalizeAppData(raw) {
 
   // Map grades to their subject's studentId if not explicitly set
   const subjectToStudentMap = new Map(subjects.map(s => [s.id, s.studentId]));
+  const subjectNameMap = new Map(subjects.map(s => [s.id, s.name]));
+  const studentNameMap = new Map(students.map(s => [s.id, s.name]));
+
   const grades = (data.grades || []).map(g => ({
     ...g,
     studentId: g.studentId || subjectToStudentMap.get(g.subjectId) || firstStudentId
   }));
 
-  return { students, subjects, grades };
+  let logs = Array.isArray(data.logs) ? data.logs : [];
+
+  // If no logs exist yet, create baseline entries for existing grades so everything is documented
+  if (logs.length === 0 && grades.length > 0) {
+    logs = grades.map(g => {
+      const stName = studentNameMap.get(g.studentId) || 'Kind';
+      const subName = subjectNameMap.get(g.subjectId) || 'Fach';
+      const subObj = subjects.find(s => s.id === g.subjectId) || { id: g.subjectId, studentId: g.studentId, name: subName, icon: '📚' };
+      const photoNames = (g.photos || []).map(p => p.name || p.storedFileName || 'Foto');
+      const detailsParts = [
+        `${subName}: Note ${Number(g.value).toFixed(2).replace('.', ',')} (${Number(g.weight) || 1}×)`,
+        `vom ${g.date || '–'}`
+      ];
+      if (g.note) detailsParts.push(`„${g.note}“`);
+      if (photoNames.length > 0) detailsParts.push(`Fotos: ${photoNames.join(', ')}`);
+
+      return {
+        id: `log-init-${g.id}`,
+        timestamp: new Date().toISOString(),
+        type: 'add',
+        action: 'Bestand gesichert',
+        studentId: g.studentId,
+        studentName: stName,
+        subjectName: subName,
+        gradeValue: g.value,
+        weight: g.weight || 1,
+        date: g.date || '',
+        note: g.note || '',
+        photoNames,
+        details: detailsParts.join(' · '),
+        snapshot: {
+          kind: 'grade',
+          grade: JSON.parse(JSON.stringify(g)),
+          subject: JSON.parse(JSON.stringify(subObj))
+        }
+      };
+    });
+  }
+
+  return { students, subjects, grades, logs };
 }
 
 function applyNormalizedDataToState(raw) {
@@ -143,6 +187,7 @@ function applyNormalizedDataToState(raw) {
   state.students = norm.students;
   state.subjects = norm.subjects;
   state.grades = norm.grades;
+  state.logs = norm.logs;
 
   const savedActive = localStorage.getItem(ACTIVE_STUDENT_STORAGE_KEY);
   if (savedActive && state.students.some(s => s.id === savedActive)) {
@@ -150,6 +195,105 @@ function applyNormalizedDataToState(raw) {
   } else if (state.students.length > 0) {
     state.activeStudentId = state.students[0].id;
   }
+}
+
+function recordAuditLog({
+  type = 'add',
+  action = 'Änderung',
+  studentId = state.activeStudentId,
+  subject = null,
+  grade = null,
+  prevGrade = null,
+  customDetails = null,
+  snapshot = null
+}) {
+  const student = state.students.find(s => s.id === studentId) || getActiveStudent();
+  const studentName = student ? student.name : 'Kind';
+  const subObj = subject || (grade ? state.subjects.find(s => s.id === grade.subjectId) : null);
+  const subjectName = subObj ? subObj.name : '';
+
+  const photoNames = grade && Array.isArray(grade.photos)
+    ? grade.photos.map(p => p.name || p.storedFileName || 'Foto')
+    : [];
+
+  let details = customDetails || '';
+  if (!details && grade) {
+    const parts = [];
+    if (subjectName) parts.push(subjectName);
+    if (prevGrade) {
+      parts.push(`Note ${formatGrade(prevGrade.value)} (${prevGrade.weight || 1}×) → ${formatGrade(grade.value)} (${grade.weight || 1}×)`);
+    } else {
+      parts.push(`Note ${formatGrade(grade.value)} (${grade.weight || 1}×)`);
+    }
+    if (grade.date) parts.push(`am ${formatGermanDateLong(grade.date)}`);
+    if (grade.note) parts.push(`„${grade.note}“`);
+    if (photoNames.length > 0) parts.push(`${photoNames.length} Foto(s): ${photoNames.join(', ')}`);
+    details = parts.join(' · ');
+  }
+
+  const entry = {
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    type,
+    action,
+    studentId,
+    studentName,
+    subjectName,
+    gradeValue: grade ? grade.value : '',
+    weight: grade ? (grade.weight || 1) : '',
+    date: grade ? (grade.date || '') : '',
+    note: grade ? (grade.note || '') : '',
+    photoNames,
+    details,
+    snapshot: snapshot || (grade ? {
+      kind: 'grade',
+      grade: JSON.parse(JSON.stringify(grade)),
+      prevGrade: prevGrade ? JSON.parse(JSON.stringify(prevGrade)) : null,
+      subject: subObj ? JSON.parse(JSON.stringify(subObj)) : null
+    } : null)
+  };
+
+  state.logs.unshift(entry);
+}
+
+function generateChangelogCsv() {
+  const escapeCsv = val => {
+    const str = val === null || val === undefined ? '' : String(val);
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const headers = [
+    'Zeitpunkt',
+    'Kind',
+    'Aktion',
+    'Fach',
+    'Note',
+    'Gewichtung',
+    'Pruefungsdatum',
+    'Notiz',
+    'Fotos',
+    'Details',
+    'Backup_Snapshot_JSON'
+  ];
+
+  const rows = [headers.join(';')];
+  for (const log of state.logs) {
+    rows.push([
+      escapeCsv(log.timestamp),
+      escapeCsv(log.studentName),
+      escapeCsv(log.action),
+      escapeCsv(log.subjectName),
+      escapeCsv(log.gradeValue !== '' && log.gradeValue !== undefined ? String(log.gradeValue).replace('.', ',') : ''),
+      escapeCsv(log.weight),
+      escapeCsv(log.date),
+      escapeCsv(log.note),
+      escapeCsv((log.photoNames || []).join(', ')),
+      escapeCsv(log.details),
+      escapeCsv(log.snapshot ? JSON.stringify(log.snapshot) : '')
+    ].join(';'));
+  }
+
+  return '\uFEFF' + rows.join('\r\n');
 }
 
 function getActiveStudent() {
@@ -413,11 +557,11 @@ async function initStorage() {
       if (remoteFile && remoteFile.content) {
         const parsed = JSON.parse(base64ToUtf8(remoteFile.content));
         const hadStudents = Array.isArray(parsed.students) && parsed.students.length > 0;
+        const hadLogs = Array.isArray(parsed.logs) && parsed.logs.length > 0;
         applyNormalizedDataToState(parsed);
         state.storageMode = 'github';
         updateSyncBadgeUi();
-        // If we just migrated single-student data to 2 students, persist the migrated structure
-        if (!hadStudents) {
+        if (!hadStudents || !hadLogs) {
           await persistState().catch(() => {});
         }
         return;
@@ -489,18 +633,24 @@ async function persistState() {
   const payload = {
     students: state.students,
     subjects: state.subjects,
-    grades: state.grades
+    grades: state.grades,
+    logs: state.logs
   };
   await idbSaveState(payload).catch(() => {});
 
   if (state.storageMode === 'github' && state.ghConfig) {
     const jsonStr = JSON.stringify(payload, null, 2);
     await ghPutFile('data/notenbuch.json', utf8ToBase64(jsonStr), 'Notenbuch aktualisiert');
+    const csvStr = generateChangelogCsv();
+    ghPutFile('data/changelog.csv', utf8ToBase64(csvStr), 'Änderungsprotokoll CSV aktualisiert').catch(() => {});
   } else if (state.storageMode === 'server') {
     await fetch('/api/state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        ...payload,
+        csv: generateChangelogCsv()
+      })
     });
   }
 }
@@ -1120,9 +1270,13 @@ async function renderApp() {
 
         itemEl.querySelector('.btn-delete-grade').addEventListener('click', async () => {
           if (confirm(`Möchtest du die Note ${formatGrade(grade.value)} in ${sub.name} wirklich löschen?`)) {
-            for (const pMeta of photos) {
-              await deleteStoredPhoto(pMeta.id, pMeta.storedFileName);
-            }
+            recordAuditLog({
+              type: 'delete',
+              action: 'Note gelöscht',
+              studentId: state.activeStudentId,
+              subject: sub,
+              grade
+            });
             state.grades = state.grades.filter(g => g.id !== grade.id);
             await persistState();
             renderApp();
@@ -1162,6 +1316,132 @@ async function renderApp() {
   attachSubjectDragHandlers(listEl, '.subject-card', () => {
     renderApp();
   });
+
+  renderChangelogSection();
+}
+
+function formatLogTimestamp(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())} Uhr`;
+  } catch (_) {
+    return iso;
+  }
+}
+
+function renderChangelogSection() {
+  const card = document.getElementById('changelog-card');
+  const toggleBtn = document.getElementById('changelog-toggle-btn');
+  const countEl = document.getElementById('changelog-count');
+  const listEl = document.getElementById('changelog-list');
+  if (!card || !listEl) return;
+
+  const activeStudent = getActiveStudent();
+  const studentLogs = state.logs.filter(l => !l.studentId || l.studentId === state.activeStudentId);
+
+  card.classList.toggle('expanded', state.changelogExpanded);
+  if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(state.changelogExpanded));
+
+  if (countEl) {
+    const countText = studentLogs.length === 1 ? '1 Eintrag' : `${studentLogs.length} Einträge`;
+    countEl.textContent = activeStudent ? `${countText} (${activeStudent.name})` : countText;
+  }
+
+  listEl.innerHTML = '';
+
+  if (studentLogs.length === 0) {
+    listEl.innerHTML = `<p class="empty-subject-hint">Noch keine protokollierten Änderungen für dieses Kind.</p>`;
+    return;
+  }
+
+  for (const log of studentLogs) {
+    const item = document.createElement('div');
+    item.className = 'changelog-item';
+
+    const badgeClass = log.type === 'delete' ? 'delete' : log.type === 'edit' ? 'edit' : 'add';
+    const canRestoreGrade =
+      log.snapshot &&
+      log.snapshot.kind === 'grade' &&
+      (log.type === 'delete' || log.type === 'edit');
+    const canRestoreSubject =
+      log.snapshot &&
+      log.snapshot.kind === 'subject' &&
+      log.type === 'delete';
+
+    item.innerHTML = `
+      <div class="changelog-item-top">
+        <span class="changelog-badge ${badgeClass}">${escapeHtml(log.action || 'Änderung')}</span>
+        <span class="changelog-time">${escapeHtml(formatLogTimestamp(log.timestamp))}</span>
+      </div>
+      <div class="changelog-details">${escapeHtml(log.details || '')}</div>
+      ${
+        canRestoreGrade || canRestoreSubject
+          ? `<div class="changelog-item-actions">
+               <button type="button" class="btn btn-secondary btn-sm btn-restore-log" title="Diesen Stand wiederherstellen">↩ Wiederherstellen</button>
+             </div>`
+          : ''
+      }
+    `;
+
+    const restoreBtn = item.querySelector('.btn-restore-log');
+    if (restoreBtn) {
+      restoreBtn.addEventListener('click', async () => {
+        if (canRestoreGrade) {
+          const targetGrade = log.type === 'edit' && log.snapshot.prevGrade
+            ? log.snapshot.prevGrade
+            : log.snapshot.grade;
+          if (!targetGrade) return;
+
+          // Ensure subject still exists for this child
+          let sub = state.subjects.find(s => s.id === targetGrade.subjectId);
+          if (!sub && log.snapshot.subject) {
+            sub = { ...log.snapshot.subject, studentId: state.activeStudentId };
+            state.subjects.push(sub);
+          }
+
+          const existingIdx = state.grades.findIndex(g => g.id === targetGrade.id);
+          if (existingIdx !== -1) {
+            state.grades[existingIdx] = JSON.parse(JSON.stringify(targetGrade));
+          } else {
+            state.grades.push(JSON.parse(JSON.stringify(targetGrade)));
+          }
+
+          recordAuditLog({
+            type: 'add',
+            action: 'Note wiederhergestellt',
+            studentId: state.activeStudentId,
+            subject: sub,
+            grade: targetGrade
+          });
+
+          await persistState();
+          renderApp();
+        } else if (canRestoreSubject && log.snapshot.subject) {
+          const subToRestore = log.snapshot.subject;
+          if (!state.subjects.some(s => s.id === subToRestore.id)) {
+            state.subjects.push(JSON.parse(JSON.stringify(subToRestore)));
+          }
+          for (const g of log.snapshot.grades || []) {
+            if (!state.grades.some(existing => existing.id === g.id)) {
+              state.grades.push(JSON.parse(JSON.stringify(g)));
+            }
+          }
+          recordAuditLog({
+            type: 'add',
+            action: 'Fach wiederhergestellt',
+            studentId: state.activeStudentId,
+            customDetails: `Fach „${subToRestore.name}“ inkl. ${(log.snapshot.grades || []).length} Note(n) wiederhergestellt`
+          });
+          await persistState();
+          renderApp();
+        }
+      });
+    }
+
+    listEl.appendChild(item);
+  }
 }
 
 // ============================================================================
@@ -1523,9 +1803,17 @@ function renderManageSubjectsList() {
     });
 
     row.querySelector('.btn-rename-sub').addEventListener('click', async () => {
+      const oldName = sub.name;
       const newName = prompt('Neuer Name für das Fach:', sub.name);
-      if (newName && newName.trim()) {
+      if (newName && newName.trim() && newName.trim() !== oldName) {
         sub.name = newName.trim();
+        recordAuditLog({
+          type: 'edit',
+          action: 'Fach umbenannt',
+          studentId: state.activeStudentId,
+          subject: sub,
+          customDetails: `Fach umbenannt: „${oldName}“ → „${sub.name}“`
+        });
         await persistState();
         renderManageSubjectsList();
         renderApp();
@@ -1538,11 +1826,18 @@ function renderManageSubjectsList() {
         : `Fach "${sub.name}" wirklich löschen?`;
       if (confirm(msg)) {
         const subGrades = state.grades.filter(g => g.subjectId === sub.id);
-        for (const g of subGrades) {
-          for (const p of g.photos || []) {
-            await deleteStoredPhoto(p.id, p.storedFileName);
+        recordAuditLog({
+          type: 'delete',
+          action: 'Fach gelöscht',
+          studentId: state.activeStudentId,
+          subject: sub,
+          customDetails: `Fach „${sub.name}“ (${gradeCount} Note(n)) gelöscht`,
+          snapshot: {
+            kind: 'subject',
+            subject: JSON.parse(JSON.stringify(sub)),
+            grades: JSON.parse(JSON.stringify(subGrades))
           }
-        }
+        });
         state.grades = state.grades.filter(g => g.subjectId !== sub.id);
         state.subjects = state.subjects.filter(s => s.id !== sub.id);
         state.expandedSubjectIds.delete(sub.id);
@@ -1957,7 +2252,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (editId) {
         const idx = state.grades.findIndex(g => g.id === editId);
         if (idx !== -1) {
-          state.grades[idx] = {
+          const prevCopy = JSON.parse(JSON.stringify(state.grades[idx]));
+          const updatedGrade = {
             ...state.grades[idx],
             studentId: state.activeStudentId,
             subjectId,
@@ -1967,9 +2263,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             note: noteVal,
             photos: finalPhotos
           };
+          state.grades[idx] = updatedGrade;
+          recordAuditLog({
+            type: 'edit',
+            action: 'Note bearbeitet',
+            studentId: state.activeStudentId,
+            grade: updatedGrade,
+            prevGrade: prevCopy
+          });
         }
       } else {
-        state.grades.push({
+        const newGrade = {
           id: `grade-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           studentId: state.activeStudentId,
           subjectId,
@@ -1978,6 +2282,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           date: dateVal,
           note: noteVal,
           photos: finalPhotos
+        };
+        state.grades.push(newGrade);
+        recordAuditLog({
+          type: 'add',
+          action: 'Note hinzugefügt',
+          studentId: state.activeStudentId,
+          grade: newGrade
         });
       }
 
@@ -2037,6 +2348,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       icon
     };
     state.subjects.push(newSub);
+    recordAuditLog({
+      type: 'add',
+      action: 'Fach hinzugefügt',
+      studentId: state.activeStudentId,
+      subject: newSub,
+      customDetails: `Fach „${newSub.icon} ${newSub.name}“ angelegt`
+    });
     newSubjectInput.value = '';
     state.newSubjectIcon = '📚';
     state.newSubjectIconManuallyChosen = false;
@@ -2047,6 +2365,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderManageSubjectsList();
     renderApp();
   });
+
+  const changelogToggleBtn = document.getElementById('changelog-toggle-btn');
+  if (changelogToggleBtn) {
+    changelogToggleBtn.addEventListener('click', () => {
+      state.changelogExpanded = !state.changelogExpanded;
+      renderChangelogSection();
+    });
+  }
+
+  const exportCsvBtn = document.getElementById('btn-export-csv');
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener('click', () => {
+      const csv = generateChangelogCsv();
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Notenbuch-Protokoll-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  }
+
+  const exportJsonBtn = document.getElementById('btn-export-json');
+  if (exportJsonBtn) {
+    exportJsonBtn.addEventListener('click', () => {
+      const jsonStr = JSON.stringify({
+        exportedAt: new Date().toISOString(),
+        students: state.students,
+        subjects: state.subjects,
+        grades: state.grades,
+        logs: state.logs
+      }, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Notenbuch-Backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  }
 
   document.getElementById('btn-close-subjects').addEventListener('click', closeSubjectsModal);
   document.getElementById('btn-close-lightbox').addEventListener('click', closeLightbox);

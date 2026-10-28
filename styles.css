@@ -1319,3 +1319,178 @@ input[type="date"].form-control {
   color-scheme: light;
 }
 
+/* Changelog & Backup Card at bottom of Child View */
+.changelog-card {
+  margin-top: 22px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.changelog-card:hover {
+  border-color: #2b3554;
+}
+
+.changelog-header {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+}
+
+.changelog-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.changelog-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background-color: #181f34;
+  border: 1px solid #263050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .changelog-icon {
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.changelog-title {
+  display: block;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.changelog-subtitle {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.changelog-card.expanded .chevron-icon {
+  transform: rotate(180deg);
+}
+
+.changelog-body {
+  display: none;
+  border-top: 1px solid var(--border-subtle);
+  padding: 14px 18px;
+}
+
+.changelog-card.expanded .changelog-body {
+  display: block;
+}
+
+.changelog-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.changelog-hint {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.changelog-hint code {
+  color: var(--accent-primary);
+}
+
+.changelog-export-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.changelog-item {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.changelog-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.changelog-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.changelog-badge.add {
+  background-color: rgba(74, 222, 128, 0.15);
+  color: var(--grade-good);
+}
+
+.changelog-badge.edit {
+  background-color: rgba(157, 168, 255, 0.16);
+  color: var(--accent-primary);
+}
+
+.changelog-badge.delete {
+  background-color: rgba(248, 113, 113, 0.16);
+  color: var(--grade-bad);
+}
+
+.changelog-time {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.changelog-details {
+  font-size: 0.83rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.changelog-meta-json {
+  font-size: 0.73rem;
+  color: var(--text-secondary);
+}
+
+.changelog-item-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+
