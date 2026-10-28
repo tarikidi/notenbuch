@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notenbuch – Alle Noten der Familie an einem Ort</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-top-bar">
+        <div>
+          <h1 class="app-title">Notenbuch</h1>
+          <p class="app-subtitle">Alle Noten der Familie an einem Ort.</p>
+        </div>
+        <button id="btn-cloud-sync" class="btn-sync-badge" type="button" title="Privates Daten-Repository verbinden">
+          <span id="sync-status-dot" class="sync-dot"></span>
+          <span id="sync-status-label">Cloud-Sync</span>
+        </button>
+      </div>
+
+      <div class="overall-stats">
+        <span id="overall-average" class="overall-score">–</span>
+        <span class="overall-label">Schnitt aller Fächer</span>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-manage-subjects" class="btn btn-secondary" type="button">
+          Fächer verwalten
+        </button>
+        <button id="btn-add-grade" class="btn btn-primary" type="button">
+          Note eintragen
+        </button>
+      </div>
+    </header>
+
+    <!-- Subject Accordion List (Drag & Drop sortable) -->
+    <main id="subjects-list" class="subjects-list" aria-label="Fächerübersicht">
+      <!-- Rendered dynamically by app.js -->
+    </main>
+
+    <footer id="lan-info-banner" class="lan-info-banner hidden">
+      <span>📱 Smartphone im WLAN:</span>
+      <code id="lan-url-text"></code>
+    </footer>
+  </div>
+
+  <!-- Modal: Note eintragen / Note bearbeiten -->
+  <div id="grade-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="grade-modal-title">
+    <div class="modal-card">
+      <h2 id="grade-modal-title" class="modal-title">Note eintragen</h2>
+      <form id="grade-form" novalidate>
+        <input type="hidden" id="grade-id-input" />
+
+        <div class="form-group">
+          <label for="grade-subject-select" class="form-label">Fach</label>
+          <div class="select-wrapper">
+            <select id="grade-subject-select" class="form-control" required></select>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="grade-value-input" class="form-label">Note (1 bis 6)</label>
+            <input
+              type="text"
+              inputmode="decimal"
+              id="grade-value-input"
+              class="form-control"
+              placeholder="z. B. 2 oder 2,5"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="grade-date-input" class="form-label">Geschrieben am</label>
+            <input
+              type="date"
+              id="grade-date-input"
+              class="form-control"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Gewichtung</label>
+          <div class="weight-toggle" role="group" aria-label="Gewichtung wählen">
+            <button type="button" class="weight-btn active" data-weight="1">1×</button>
+            <button type="button" class="weight-btn" data-weight="2">2×</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="grade-note-input" class="form-label">Art oder Notiz (optional)</label>
+          <input
+            type="text"
+            id="grade-note-input"
+            class="form-control"
+            placeholder="z. B. Schulaufgabe, Ex, Test"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fotos der Schulaufgabe <span class="label-hint">(Originalgröße)</span></label>
+          <div id="modal-photo-grid" class="photo-upload-grid">
+            <label for="grade-photo-input" class="photo-add-tile" title="Foto in Originalgröße auswählen">
+              <span>Foto<br>hinzufügen</span>
+            </label>
+          </div>
+          <input
+            type="file"
+            id="grade-photo-input"
+            accept="image/*"
+            multiple
+            class="sr-only"
+          />
+        </div>
+
+        <div id="grade-form-error" class="form-error hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-grade" class="btn btn-secondary">Abbrechen</button>
+          <button type="submit" id="btn-save-grade" class="btn btn-primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Fächer verwalten (mit Icons & Drag-and-Drop Sortierung) -->
+  <div id="subjects-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="subjects-modal-title">
+    <div class="modal-card">
+      <h2 id="subjects-modal-title" class="modal-title">Fächer verwalten</h2>
+
+      <form id="add-subject-form" class="add-subject-form">
+        <div class="add-subject-row">
+          <button
+            type="button"
+            id="new-subject-icon-btn"
+            class="icon-trigger-btn"
+            title="Icon für das neue Fach wählen"
+          >
+            📚
+          </button>
+          <input
+            type="text"
+            id="new-subject-input"
+            class="form-control"
+            placeholder="Neues Fach (z. B. Biologie, Kunst ...)"
+            required
+          />
+          <button type="submit" class="btn btn-primary">Hinzufügen</button>
+        </div>
+
+        <!-- Collapsible Icon Picker Grid -->
+        <div id="icon-picker-panel" class="icon-picker-panel hidden">
+          <div class="icon-picker-header">
+            <span class="icon-picker-title" id="icon-picker-label">Icon auswählen</span>
+            <button type="button" id="btn-close-icon-picker" class="icon-picker-close">×</button>
+          </div>
+          <div id="icon-picker-grid" class="icon-picker-grid"></div>
+        </div>
+      </form>
+
+      <p class="drag-hint">💡 Tipp: Fächer per Drag &amp; Drop am Griff <code>⋮⋮</code> sortieren oder aufs Icon klicken, um es zu ändern.</p>
+
+      <div id="manage-subjects-list" class="manage-subjects-list">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-close-subjects" class="btn btn-secondary">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Privates GitHub Cloud-Sync Einstellungen -->
+  <div id="sync-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sync-modal-title">
+    <div class="modal-card">
+      <h2 id="sync-modal-title" class="modal-title">🔒 Privates GitHub Daten-Repo</h2>
+      <p class="sync-desc">
+        Deine Noten und Originalfotos werden ausschließlich in deinem <strong>privaten</strong> GitHub-Repository (z. B. <code>notenbuch-daten</code>) gespeichert. Ohne deinen Token sieht niemand deine Daten.
+      </p>
+
+      <form id="sync-form" novalidate>
+        <div class="form-group">
+          <label for="gh-repo-input" class="form-label">Privates Daten-Repository (Nutzername/Repo)</label>
+          <input
+            type="text"
+            id="gh-repo-input"
+            class="form-control"
+            placeholder="z. B. tarik/notenbuch-daten"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="gh-branch-input" class="form-label">Branch</label>
+          <input
+            type="text"
+            id="gh-branch-input"
+            class="form-control"
+            placeholder="main"
+            value="main"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="gh-token-input" class="form-label">GitHub Personal Access Token</label>
+          <input
+            type="password"
+            id="gh-token-input"
+            class="form-control"
+            placeholder="ghp_... oder github_pat_..."
+            required
+          />
+          <span class="field-help">
+            Wird nur lokal auf diesem Gerät im Browser gespeichert. Benötigt Berechtigung <code>repo</code>.
+          </span>
+        </div>
+
+        <div id="sync-form-status" class="form-error hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-disconnect-sync" class="btn btn-danger-outline hidden">Trennen</button>
+          <button type="button" id="btn-close-sync" class="btn btn-secondary">Schließen</button>
+          <button type="submit" id="btn-save-sync" class="btn btn-primary">Verbinden &amp; Synchronisieren</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lightbox Modal: Foto in Originalgröße ansehen & herunterladen -->
+  <div id="lightbox-modal" class="modal-backdrop lightbox-backdrop hidden" role="dialog" aria-modal="true" aria-label="Foto in Originalgröße">
+    <div class="lightbox-container">
+      <div class="lightbox-header">
+        <div class="lightbox-meta">
+          <span id="lightbox-filename" class="lightbox-title">Foto</span>
+          <span id="lightbox-details" class="lightbox-subtitle">Originalgröße</span>
+        </div>
+        <div class="lightbox-actions">
+          <a id="lightbox-download-btn" class="btn btn-primary btn-sm" href="#" download>
+            ⬇ Original herunterladen
+          </a>
+          <button type="button" id="btn-close-lightbox" class="btn btn-secondary btn-sm">
+            Schließen
+          </button>
+        </div>
+      </div>
+      <div class="lightbox-body">
+        <img id="lightbox-img" src="" alt="Schulaufgabe in Originalgröße" />
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

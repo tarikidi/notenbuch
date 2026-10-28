@@ -1,0 +1,9 @@
+{
+  "name": "notenbuch",
+  "version": "1.0.0",
+  "description": "Notenbuch Web-App zum Eintragen und Verfolgen von Schulnoten inkl. Original-Foto-Upload & Download",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
