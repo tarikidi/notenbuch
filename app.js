@@ -201,18 +201,18 @@ function detectRepoFromGithubPagesUrl() {
 
 function updateSyncBadgeUi() {
   const dot = document.getElementById('sync-status-dot');
-  const label = document.getElementById('sync-status-label');
-  if (!dot || !label) return;
+  const btn = document.getElementById('btn-cloud-sync');
+  if (!dot) return;
 
   if (state.storageMode === 'github' && state.ghConfig) {
     dot.classList.add('online');
-    label.textContent = 'GitHub Sync aktiv';
+    if (btn) btn.title = 'GitHub Cloud-Sync aktiv (Klicken für Einstellungen)';
   } else if (state.storageMode === 'server') {
     dot.classList.add('online');
-    label.textContent = 'Lokaler Server';
+    if (btn) btn.title = 'Lokaler Server aktiv (Klicken für Cloud-Sync)';
   } else {
     dot.classList.remove('online');
-    label.textContent = 'Cloud-Sync';
+    if (btn) btn.title = 'Cloud-Sync einrichten';
   }
 }
 
@@ -1153,8 +1153,10 @@ async function renderApp() {
     footerEl.className = 'subject-footer';
     const addSubGradeBtn = document.createElement('button');
     addSubGradeBtn.type = 'button';
-    addSubGradeBtn.className = 'btn btn-secondary btn-sm';
-    addSubGradeBtn.textContent = `Note für ${sub.name}`;
+    addSubGradeBtn.className = 'btn btn-secondary btn-subject-add-plus';
+    addSubGradeBtn.textContent = '+';
+    addSubGradeBtn.title = `Note für ${sub.name} eintragen`;
+    addSubGradeBtn.setAttribute('aria-label', `Note für ${sub.name} eintragen`);
     addSubGradeBtn.addEventListener('click', () => {
       openGradeModal({ preselectSubjectId: sub.id });
     });

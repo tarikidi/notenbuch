@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=4" />
+  <link rel="stylesheet" href="styles.css?v=6" />
 </head>
 <body>
   <div class="app-container">
@@ -18,9 +18,8 @@
           <h1 class="app-title">Notenbuch</h1>
           <p class="app-subtitle">Alle Noten der Familie an einem Ort.</p>
         </div>
-        <button id="btn-cloud-sync" class="btn-sync-badge" type="button" title="Privates Daten-Repository verbinden">
+        <button id="btn-cloud-sync" class="btn-sync-dot-only" type="button" title="GitHub Cloud-Sync Status & Einstellungen" aria-label="GitHub Cloud-Sync Einstellungen">
           <span id="sync-status-dot" class="sync-dot"></span>
-          <span id="sync-status-label">Cloud-Sync</span>
         </button>
       </div>
 
@@ -31,19 +30,11 @@
         </div>
         <button
           id="btn-manage-students"
-          class="btn-students-settings"
+          class="btn-students-plus"
           type="button"
-          title="Kinder verwalten (Namen ändern, Avatar wählen oder Kind hinzufügen)"
+          title="Kinder verwalten / Kind hinzufügen"
           aria-label="Kinder verwalten"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          <span>Kinder</span>
-        </button>
+        >+</button>
       </div>
 
       <div class="overall-stats">
@@ -328,6 +319,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

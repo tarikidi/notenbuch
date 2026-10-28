@@ -60,37 +60,35 @@ body {
   gap: 12px;
 }
 
-.btn-sync-badge {
+.btn-sync-dot-only {
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
   background-color: #131828;
   border: 1px solid #263050;
-  color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 6px 11px;
-  border-radius: 999px;
+  border-radius: 50%;
   cursor: pointer;
+  flex-shrink: 0;
   transition: all 0.15s ease;
 }
 
-.btn-sync-badge:hover {
+.btn-sync-dot-only:hover {
   border-color: var(--accent-primary);
-  color: var(--text-primary);
+  transform: scale(1.06);
 }
 
 .sync-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background-color: var(--text-muted);
 }
 
 .sync-dot.online {
   background-color: var(--grade-good);
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+  box-shadow: 0 0 9px rgba(74, 222, 128, 0.75);
 }
 
 .sync-desc {
@@ -124,14 +122,14 @@ body {
 .students-switcher-wrap {
   display: flex;
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 22px;
 }
 
 .student-cards-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
   flex: 1;
 }
 
@@ -139,8 +137,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 11px 14px;
+  gap: 8px;
+  padding: 10px 12px;
   border-radius: var(--radius-lg);
   background-color: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -167,20 +165,21 @@ body {
 .student-card-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
+  flex: 1;
 }
 
 .student-avatar-circle {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   background-color: #181f34;
   border: 1px solid #283354;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.08rem;
   flex-shrink: 0;
 }
 
@@ -193,51 +192,60 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
 }
 
 .student-card-name {
-  font-size: 0.94rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .student-card-meta {
-  font-size: 0.73rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
 }
 
 .student-card-avg {
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-weight: 800;
   flex-shrink: 0;
 }
 
-.btn-students-settings {
+.btn-students-plus {
+  width: 42px;
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 8px 13px;
   border-radius: var(--radius-lg);
   background-color: var(--bg-card);
   border: 1px solid var(--border-card);
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 0.72rem;
+  font-size: 1.35rem;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.15s ease;
 }
 
-.btn-students-settings:hover {
+.btn-students-plus:hover {
   background-color: var(--bg-card-hover);
   border-color: var(--accent-primary);
   color: var(--text-primary);
+}
+
+.btn-subject-add-plus {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  padding: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* Manage Students Modal */
