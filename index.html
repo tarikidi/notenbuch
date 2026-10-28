@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
   <div class="app-container">
@@ -18,9 +18,26 @@
           <h1 class="app-title">Notenbuch</h1>
           <p class="app-subtitle">Alle Noten der Familie an einem Ort.</p>
         </div>
-        <button id="btn-cloud-sync" class="btn-sync-dot-only" type="button" title="GitHub Cloud-Sync Status & Einstellungen" aria-label="GitHub Cloud-Sync Einstellungen">
-          <span id="sync-status-dot" class="sync-dot"></span>
-        </button>
+        <div class="header-top-controls">
+          <button
+            id="btn-theme-toggle"
+            class="btn-icon-circle"
+            type="button"
+            title="Hell-/Dunkelmodus umschalten"
+            aria-label="Hell-/Dunkelmodus umschalten"
+          >
+            ☀️
+          </button>
+          <button
+            id="btn-cloud-sync"
+            class="btn-sync-dot-only"
+            type="button"
+            title="GitHub Cloud-Sync Status & Einstellungen"
+            aria-label="GitHub Cloud-Sync Einstellungen"
+          >
+            <span id="sync-status-dot" class="sync-dot"></span>
+          </button>
+        </div>
       </div>
 
       <!-- Student / Child Switcher Cards -->
@@ -314,6 +331,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

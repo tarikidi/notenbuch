@@ -865,11 +865,12 @@ function renderSubjectChartSvg(grades) {
     gridLines += `
       <line
         x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}"
-        stroke="${isDashed ? '#2b3553' : '#1b2236'}"
+        stroke="${isDashed ? 'var(--text-muted)' : 'var(--border-subtle)'}"
+        stroke-opacity="${isDashed ? '0.45' : '1'}"
         stroke-width="1"
         ${isDashed ? 'stroke-dasharray="4 4"' : ''}
       />
-      <text x="${padLeft - 10}" y="${Number(y) + 4}" text-anchor="end" fill="#7c869b" font-size="11" font-family="Inter, sans-serif">${gradeLine}</text>
+      <text x="${padLeft - 10}" y="${Number(y) + 4}" text-anchor="end" fill="var(--text-muted)" font-size="11" font-family="Inter, sans-serif">${gradeLine}</text>
     `;
   }
 
@@ -882,7 +883,7 @@ function renderSubjectChartSvg(grades) {
   let polyline = '';
   if (points.length > 1) {
     const ptsAttr = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-    polyline = `<polyline fill="none" stroke="#8e9aff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${ptsAttr}" />`;
+    polyline = `<polyline fill="none" stroke="var(--accent-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${ptsAttr}" />`;
   }
 
   let nodes = '';
@@ -900,11 +901,11 @@ function renderSubjectChartSvg(grades) {
 
     nodes += `
       <g class="chart-node">
-        <circle cx="${cx}" cy="${cy}" r="4.5" fill="#121726" stroke="#9da8ff" stroke-width="2.5" />
-        <text x="${cx}" y="${labelY}" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="700" font-family="Inter, sans-serif">${formatGrade(p.grade.value)}</text>
+        <circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--bg-card)" stroke="var(--accent-primary)" stroke-width="2.5" />
+        <text x="${cx}" y="${labelY}" text-anchor="middle" fill="var(--text-primary)" font-size="11" font-weight="700" font-family="Inter, sans-serif">${formatGrade(p.grade.value)}</text>
         ${
           showDate
-            ? `<text x="${cx}" y="${height - 4}" text-anchor="middle" fill="#8c96b2" font-size="11" font-family="Inter, sans-serif">${dateLabel}</text>`
+            ? `<text x="${cx}" y="${height - 4}" text-anchor="middle" fill="var(--text-secondary)" font-size="11" font-family="Inter, sans-serif">${dateLabel}</text>`
             : ''
         }
       </g>
@@ -1665,6 +1666,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     grades: []
   });
   renderStudentTabs();
+
+  const THEME_STORAGE_KEY = 'notenbuch_theme_v1';
+  const themeBtn = document.getElementById('btn-theme-toggle');
+
+  function applyTheme(theme) {
+    const isLight = theme === 'light';
+    if (isLight) {
+      document.documentElement.setAttribute('data-theme', 'light');
+      if (themeBtn) {
+        themeBtn.textContent = '🌙';
+        themeBtn.title = 'Zu Dunkelmodus wechseln';
+      }
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      if (themeBtn) {
+        themeBtn.textContent = '☀️';
+        themeBtn.title = 'Zu Hellmodus wechseln';
+      }
+    }
+  }
+
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'dark';
+  applyTheme(savedTheme);
+
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      localStorage.setItem(THEME_STORAGE_KEY, next);
+      applyTheme(next);
+    });
+  }
 
   document.getElementById('btn-manage-students').addEventListener('click', () => {
     openStudentsModal();

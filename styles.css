@@ -27,6 +27,31 @@
   --radius-sm: 8px;
 }
 
+[data-theme="light"] {
+  --bg-main: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-modal: #ffffff;
+  --bg-input: #f8fafc;
+  --border-card: #dce3f0;
+  --border-subtle: #e2e8f0;
+  --border-focus: #4f46e5;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  --accent-primary: #4f46e5;
+  --accent-primary-hover: #4338ca;
+  --accent-text: #ffffff;
+
+  --grade-good: #16a34a;
+  --grade-medium: #ca8a04;
+  --grade-warn: #ea580c;
+  --grade-bad: #dc2626;
+  --grade-none: #94a3b8;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -1181,3 +1206,116 @@ input[type="date"].form-control {
   border-radius: 6px;
   display: block;
 }
+
+/* Header Top Right Controls (Theme Toggle + Sync Dot) */
+.header-top-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-icon-circle {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 50%;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-icon-circle:hover {
+  border-color: var(--accent-primary);
+  transform: scale(1.06);
+}
+
+/* Light Mode Refinements */
+[data-theme="light"] .btn-sync-dot-only {
+  background-color: var(--bg-card);
+  border-color: var(--border-card);
+}
+
+[data-theme="light"] .btn-secondary {
+  background-color: #ffffff;
+  color: var(--text-primary);
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+[data-theme="light"] .btn-danger-outline {
+  background-color: #fff1f2;
+  color: #dc2626;
+  border-color: #fecdd3;
+}
+
+[data-theme="light"] .btn-danger-outline:hover {
+  background-color: #ffe4e6;
+  border-color: #f87171;
+}
+
+[data-theme="light"] .student-avatar-circle,
+[data-theme="light"] .subject-icon-badge,
+[data-theme="light"] .icon-trigger-btn,
+[data-theme="light"] .manage-subject-icon-btn {
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .student-card-tab.active {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(79, 70, 229, 0.03));
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.12);
+}
+
+[data-theme="light"] .student-card-tab.active .student-avatar-circle {
+  background-color: rgba(79, 70, 229, 0.15);
+  border-color: var(--accent-primary);
+}
+
+[data-theme="light"] .subject-card {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+[data-theme="light"] .subject-card:hover {
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .grade-badge {
+  background-color: #f8fafc;
+}
+
+[data-theme="light"] .weight-pill {
+  background-color: #e0e7ff;
+  color: #4338ca;
+}
+
+[data-theme="light"] .photo-add-tile {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .photo-add-tile:hover {
+  background-color: #f1f5f9;
+  border-color: var(--accent-primary);
+}
+
+[data-theme="light"] .student-name-input,
+[data-theme="light"] .icon-option-btn {
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] input[type="date"].form-control {
+  color-scheme: light;
+}
+
