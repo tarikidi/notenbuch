@@ -69,7 +69,7 @@ const state = {
   subjects: [],
   grades: [],
   lanUrls: [],
-  expandedSubjectIds: new Set(['sub-deutsch']),
+  expandedSubjectIds: new Set(),
   storageMode: 'idb', // 'github' | 'server' | 'idb'
   ghConfig: null,
   modalPhotos: [],
