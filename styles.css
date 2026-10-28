@@ -1494,3 +1494,20 @@ input[type="date"].form-control {
 }
 
 
+
+.changelog-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.changelog-device-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  color: var(--text-secondary);
+}

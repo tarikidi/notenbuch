@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body>
   <div class="app-container">
@@ -86,7 +86,9 @@
 
       <div id="changelog-body" class="changelog-body">
         <div class="changelog-toolbar">
-          <span class="changelog-hint">Alle Änderungen werden automatisch in <code>notenbuch-daten</code> (JSON &amp; CSV) gesichert.</span>
+          <button type="button" id="btn-set-device-name" class="btn btn-secondary btn-sm" title="Name für dieses Gerät / Person festlegen (z. B. Papa, Mama, PC)">
+            📱 <span id="current-device-label">Gerät</span> ✎
+          </button>
           <div class="changelog-export-btns">
             <button type="button" id="btn-export-csv" class="btn btn-secondary btn-sm" title="Protokoll als CSV herunterladen">⬇ CSV</button>
             <button type="button" id="btn-export-json" class="btn btn-secondary btn-sm" title="Komplettes Backup als JSON herunterladen">⬇ JSON</button>
@@ -360,6 +362,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

@@ -199,6 +199,42 @@ function applyNormalizedDataToState(raw) {
   }
 }
 
+const DEVICE_ID_STORAGE_KEY = 'notenbuch_device_id_v1';
+const DEVICE_NAME_STORAGE_KEY = 'notenbuch_device_name_v1';
+
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+  if (!id) {
+    id = `dev-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+  }
+  return id;
+}
+
+function detectDefaultDeviceName() {
+  const ua = navigator.userAgent || '';
+  const shortTag = getOrCreateDeviceId().replace('dev-', '#');
+  if (/iPhone/i.test(ua)) return `iPhone (${shortTag})`;
+  if (/iPad/i.test(ua)) return `iPad (${shortTag})`;
+  if (/Android/i.test(ua)) return `Smartphone (${shortTag})`;
+  if (/Macintosh|Mac OS/i.test(ua)) return `Mac (${shortTag})`;
+  if (/Windows/i.test(ua)) return `Windows-PC (${shortTag})`;
+  return `Gerät (${shortTag})`;
+}
+
+function getDeviceName() {
+  const custom = localStorage.getItem(DEVICE_NAME_STORAGE_KEY);
+  if (custom && custom.trim()) return custom.trim();
+  return detectDefaultDeviceName();
+}
+
+function updateDeviceLabelUi() {
+  const el = document.getElementById('current-device-label');
+  if (el) {
+    el.textContent = getDeviceName();
+  }
+}
+
 function recordAuditLog({
   type = 'add',
   action = 'Änderung',
@@ -236,6 +272,8 @@ function recordAuditLog({
   const entry = {
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     timestamp: new Date().toISOString(),
+    deviceId: getOrCreateDeviceId(),
+    deviceName: getDeviceName(),
     type,
     action,
     studentId,
@@ -267,6 +305,7 @@ function generateChangelogCsv() {
   const headers = [
     'Zeitpunkt',
     'Kind',
+    'Geraet_Person',
     'Aktion',
     'Fach',
     'Note',
@@ -283,6 +322,7 @@ function generateChangelogCsv() {
     rows.push([
       escapeCsv(log.timestamp),
       escapeCsv(log.studentName),
+      escapeCsv(log.deviceName || 'Hauptgerät'),
       escapeCsv(log.action),
       escapeCsv(log.subjectName),
       escapeCsv(log.gradeValue !== '' && log.gradeValue !== undefined ? String(log.gradeValue).replace('.', ',') : ''),
@@ -1632,7 +1672,10 @@ function renderChangelogSection() {
 
     item.innerHTML = `
       <div class="changelog-item-top">
-        <span class="changelog-badge ${badgeClass}">${escapeHtml(log.action || 'Änderung')}</span>
+        <div class="changelog-badges-row">
+          <span class="changelog-badge ${badgeClass}">${escapeHtml(log.action || 'Änderung')}</span>
+          <span class="changelog-device-badge" title="Gerät / Person">📱 ${escapeHtml(log.deviceName || 'Hauptgerät')}</span>
+        </div>
         <span class="changelog-time">${escapeHtml(formatLogTimestamp(log.timestamp))}</span>
       </div>
       <div class="changelog-details">${escapeHtml(log.details || '')}</div>
@@ -2884,6 +2927,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderManageSubjectsList();
     renderApp();
   });
+
+  updateDeviceLabelUi();
+  const setDeviceBtn = document.getElementById('btn-set-device-name');
+  if (setDeviceBtn) {
+    setDeviceBtn.addEventListener('click', async () => {
+      const current = getDeviceName();
+      const input = prompt(
+        'Wie soll dieses Gerät im Änderungsprotokoll heißen?\n(z. B. „Papa (Handy)“, „Mama (Handy)“ oder „PC“)',
+        current
+      );
+      if (input !== null && input.trim()) {
+        const newName = input.trim();
+        localStorage.setItem(DEVICE_NAME_STORAGE_KEY, newName);
+        updateDeviceLabelUi();
+
+        const myDeviceId = getOrCreateDeviceId();
+        let updatedAny = false;
+        for (const log of state.logs) {
+          if (log.deviceId === myDeviceId) {
+            log.deviceName = newName;
+            updatedAny = true;
+          }
+        }
+        if (updatedAny) {
+          await persistState().catch(() => {});
+        }
+        renderChangelogSection();
+      }
+    });
+  }
 
   const changelogToggleBtn = document.getElementById('changelog-toggle-btn');
   if (changelogToggleBtn) {
