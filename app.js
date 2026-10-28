@@ -696,10 +696,10 @@ function calculateSubjectAverage(subjectId) {
   return totalWeight > 0 ? weightedSum / totalWeight : null;
 }
 
-function calculateOverallAverageForActiveStudent() {
-  const activeSubjects = getActiveSubjects();
+function calculateOverallAverageForStudent(studentId) {
+  const stSubjects = state.subjects.filter(s => s.studentId === studentId);
   const subjectAverages = [];
-  for (const sub of activeSubjects) {
+  for (const sub of stSubjects) {
     const avg = calculateSubjectAverage(sub.id);
     if (avg !== null) {
       subjectAverages.push(avg);
@@ -708,6 +708,10 @@ function calculateOverallAverageForActiveStudent() {
   if (subjectAverages.length === 0) return null;
   const sum = subjectAverages.reduce((acc, v) => acc + v, 0);
   return sum / subjectAverages.length;
+}
+
+function calculateOverallAverageForActiveStudent() {
+  return calculateOverallAverageForStudent(state.activeStudentId);
 }
 
 // ============================================================================
@@ -929,14 +933,25 @@ function renderStudentTabs() {
 
   for (const st of state.students) {
     const isActive = st.id === state.activeStudentId;
+    const stSubjects = state.subjects.filter(s => s.studentId === st.id);
+    const subIds = new Set(stSubjects.map(s => s.id));
+    const gradeCount = state.grades.filter(g => subIds.has(g.subjectId)).length;
+    const stAvg = calculateOverallAverageForStudent(st.id);
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.role = 'tab';
     btn.setAttribute('aria-selected', String(isActive));
-    btn.className = `student-tab${isActive ? ' active' : ''}`;
+    btn.className = `student-card-tab${isActive ? ' active' : ''}`;
     btn.innerHTML = `
-      <span class="student-tab-avatar">${escapeHtml(st.icon || '🧒')}</span>
-      <span>${escapeHtml(st.name)}</span>
+      <div class="student-card-left">
+        <div class="student-avatar-circle">${escapeHtml(st.icon || '🧒')}</div>
+        <div class="student-card-info">
+          <span class="student-card-name">${escapeHtml(st.name)}</span>
+          <span class="student-card-meta">${gradeCount === 1 ? '1 Note' : `${gradeCount} Noten`}</span>
+        </div>
+      </div>
+      <span class="student-card-avg ${getGradeColorClass(stAvg)}">${formatGrade(stAvg)}</span>
     `;
     btn.addEventListener('click', () => {
       state.activeStudentId = st.id;
@@ -1170,9 +1185,11 @@ function openStudentsModal() {
   setTimeout(() => document.getElementById('new-student-input').focus(), 50);
 }
 
-function closeStudentsModal() {
+async function closeStudentsModal() {
   document.getElementById('student-icon-picker-panel').classList.add('hidden');
   document.getElementById('students-modal').classList.add('hidden');
+  await persistState().catch(() => {});
+  renderApp();
 }
 
 function openStudentAvatarPickerFor(targetStudentId = null) {
@@ -1229,35 +1246,40 @@ function renderManageStudentsList() {
     const gradeCount = state.grades.filter(g => subIds.has(g.subjectId)).length;
 
     const row = document.createElement('div');
-    row.className = 'manage-subject-item';
+    row.className = 'student-edit-row';
     row.innerHTML = `
-      <div class="manage-subject-left">
-        <button type="button" class="manage-subject-icon-btn" title="Avatar ändern">${escapeHtml(st.icon || '🧒')}</button>
-        <div>
-          <div class="manage-subject-name">${escapeHtml(st.name)}</div>
-          <div class="subject-count">${stSubjects.length} Fächer · ${gradeCount === 1 ? '1 Note' : `${gradeCount} Noten`}</div>
-        </div>
-      </div>
-      <div class="manage-subject-actions">
-        <button type="button" class="btn btn-secondary btn-sm btn-rename-student">Umbenennen</button>
-        ${
-          state.students.length > 1
-            ? `<button type="button" class="btn btn-danger-outline btn-sm btn-delete-student">Löschen</button>`
-            : ''
-        }
-      </div>
+      <button type="button" class="manage-subject-icon-btn" title="Avatar ändern">${escapeHtml(st.icon || '🧒')}</button>
+      <input
+        type="text"
+        class="student-name-input"
+        value="${escapeHtml(st.name)}"
+        placeholder="Name des Kindes"
+        aria-label="Name des Kindes"
+      />
+      ${
+        state.students.length > 1
+          ? `<button type="button" class="btn btn-danger-outline btn-sm btn-delete-student" title="Kind löschen">Löschen</button>`
+          : ''
+      }
     `;
 
     row.querySelector('.manage-subject-icon-btn').addEventListener('click', () => {
       openStudentAvatarPickerFor(st.id);
     });
 
-    row.querySelector('.btn-rename-student').addEventListener('click', async () => {
-      const newName = prompt('Name des Kindes:', st.name);
-      if (newName && newName.trim()) {
-        st.name = newName.trim();
+    const nameInput = row.querySelector('.student-name-input');
+    nameInput.addEventListener('input', () => {
+      const val = nameInput.value.trim();
+      if (val) {
+        st.name = val;
+        renderStudentTabs();
+      }
+    });
+    nameInput.addEventListener('change', async () => {
+      const val = nameInput.value.trim();
+      if (val) {
+        st.name = val;
         await persistState();
-        renderManageStudentsList();
         renderApp();
       }
     });
@@ -1641,8 +1663,16 @@ function escapeHtml(str) {
 // Event Listeners & Initialization
 // ============================================================================
 document.addEventListener('DOMContentLoaded', async () => {
-  await initStorage();
-  await renderApp();
+  // Initialize default structure immediately so UI & buttons work before async storage finishes
+  applyNormalizedDataToState({
+    students: [
+      { id: 'student-1', name: 'Kind 1', icon: '👦' },
+      { id: 'student-2', name: 'Kind 2', icon: '👧' }
+    ],
+    subjects: [],
+    grades: []
+  });
+  renderStudentTabs();
 
   document.getElementById('btn-manage-students').addEventListener('click', () => {
     openStudentsModal();
@@ -2017,4 +2047,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       closeSyncModal();
     }
   });
+
+  await initStorage();
+  await renderApp();
 });

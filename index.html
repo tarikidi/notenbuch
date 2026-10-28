@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body>
   <div class="app-container">
@@ -24,13 +24,25 @@
         </button>
       </div>
 
-      <!-- Student / Child Switcher Tabs -->
-      <div class="students-bar" role="tablist" aria-label="Schüler auswählen">
-        <div id="student-tabs" class="student-tabs">
+      <!-- Student / Child Switcher Cards -->
+      <div class="students-switcher-wrap">
+        <div id="student-tabs" class="student-cards-row" role="tablist" aria-label="Kind auswählen">
           <!-- Rendered dynamically by app.js -->
         </div>
-        <button id="btn-manage-students" class="btn-manage-students" type="button" title="Kinder / Schüler verwalten (Namen ändern oder hinzufügen)">
-          ✎ Kinder
+        <button
+          id="btn-manage-students"
+          class="btn-students-settings"
+          type="button"
+          title="Kinder verwalten (Namen ändern, Avatar wählen oder Kind hinzufügen)"
+          aria-label="Kinder verwalten"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Kinder</span>
         </button>
       </div>
 
@@ -64,14 +76,30 @@
   <div id="students-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="students-modal-title">
     <div class="modal-card">
       <h2 id="students-modal-title" class="modal-title">Kinder verwalten</h2>
+      <p class="sync-desc">
+        Hier kannst du die Namen und Avatare deiner Kinder direkt anpassen oder ein weiteres Kind hinzufügen.
+      </p>
 
-      <form id="add-student-form" class="add-subject-form">
+      <div id="manage-students-list" class="manage-students-list">
+        <!-- Populated dynamically with direct inline name input & avatar button -->
+      </div>
+
+      <div id="student-icon-picker-panel" class="icon-picker-panel hidden">
+        <div class="icon-picker-header">
+          <span class="icon-picker-title" id="student-icon-picker-label">Avatar auswählen</span>
+          <button type="button" id="btn-close-student-icon-picker" class="icon-picker-close">×</button>
+        </div>
+        <div id="student-icon-picker-grid" class="icon-picker-grid"></div>
+      </div>
+
+      <form id="add-student-form" class="add-student-box">
+        <label class="form-label">Weiteres Kind hinzufügen</label>
         <div class="add-subject-row">
           <button
             type="button"
             id="new-student-icon-btn"
             class="icon-trigger-btn"
-            title="Avatar für das Kind wählen"
+            title="Avatar für das neue Kind wählen"
           >
             🧒
           </button>
@@ -79,29 +107,15 @@
             type="text"
             id="new-student-input"
             class="form-control"
-            placeholder="Name des Kindes ..."
+            placeholder="Name (z. B. Muhammed, Elif ...)"
             required
           />
-          <button type="submit" class="btn btn-primary">Hinzufügen</button>
-        </div>
-
-        <div id="student-icon-picker-panel" class="icon-picker-panel hidden">
-          <div class="icon-picker-header">
-            <span class="icon-picker-title" id="student-icon-picker-label">Avatar auswählen</span>
-            <button type="button" id="btn-close-student-icon-picker" class="icon-picker-close">×</button>
-          </div>
-          <div id="student-icon-picker-grid" class="icon-picker-grid"></div>
+          <button type="submit" class="btn btn-primary">Anlegen</button>
         </div>
       </form>
 
-      <p class="drag-hint">💡 Tipp: Klicke auf „Umbenennen“, um den Namen anzupassen, oder auf das Avatar-Icon, um es zu ändern.</p>
-
-      <div id="manage-students-list" class="manage-subjects-list">
-        <!-- Populated dynamically -->
-      </div>
-
       <div class="modal-actions">
-        <button type="button" id="btn-close-students" class="btn btn-secondary">Schließen</button>
+        <button type="button" id="btn-close-students" class="btn btn-primary">Fertig</button>
       </div>
     </div>
   </div>
@@ -314,6 +328,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
