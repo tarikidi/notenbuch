@@ -176,6 +176,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'Ungültige Datenstruktur' });
       }
       writeDb({
+        students: data.students || [],
         subjects: data.subjects,
         grades: data.grades
       });

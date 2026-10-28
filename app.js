@@ -1,5 +1,5 @@
 // ============================================================================
-// Notenbuch App – State, Storage (GitHub Cloud Sync + Server API + IndexedDB)
+// Notenbuch App – Multi-Student (Kinder), Icons, Drag & Drop, GitHub Cloud-Sync
 // ============================================================================
 
 const SUBJECT_ICONS_LIST = [
@@ -7,6 +7,11 @@ const SUBJECT_ICONS_LIST = [
   '🎨', '⚽', '🏛️', '💻', '🇫🇷', '🇪🇸', '🏺', '🕊️',
   '⚖️', '📊', '🌱', '🔬', '🧮', '🎭', '🛠️', '📚',
   '✏️', '📝', '🧠', '🔭', '🎻', '🏀', '🏊', '🎓'
+];
+
+const STUDENT_AVATARS_LIST = [
+  '👦', '👧', '🧒', '🧑', '🎓', '🌟', '⚽', '🏀',
+  '🦄', '🦁', '🐼', '🦊', '🚀', '🎮', '🎨', '🎵'
 ];
 
 const DEFAULT_SUBJECT_ICONS = {
@@ -45,21 +50,36 @@ function guessIconForSubject(name = '') {
   return '📚';
 }
 
+function createDefaultSubjectsForStudent(studentId) {
+  return [
+    { id: `sub-${studentId}-deutsch`, studentId, name: 'Deutsch', icon: '📖' },
+    { id: `sub-${studentId}-mathematik`, studentId, name: 'Mathematik', icon: '📐' },
+    { id: `sub-${studentId}-englisch`, studentId, name: 'Englisch', icon: '🇬🇧' },
+    { id: `sub-${studentId}-geographie`, studentId, name: 'Geographie', icon: '🌍' },
+    { id: `sub-${studentId}-musik`, studentId, name: 'Musik', icon: '🎵' }
+  ];
+}
+
 const GH_SYNC_STORAGE_KEY = 'notenbuch_gh_sync_config_v1';
+const ACTIVE_STUDENT_STORAGE_KEY = 'notenbuch_active_student_v1';
 
 const state = {
+  students: [],
+  activeStudentId: 'student-1',
   subjects: [],
   grades: [],
   lanUrls: [],
   expandedSubjectIds: new Set(['sub-deutsch']),
   storageMode: 'idb', // 'github' | 'server' | 'idb'
-  ghConfig: null, // { repo: 'owner/repo', branch: 'main', token: '...' }
+  ghConfig: null,
   modalPhotos: [],
   removedPhotoIds: [],
   selectedWeight: 1,
   newSubjectIcon: '📚',
   newSubjectIconManuallyChosen: false,
-  iconPickerTargetSubjectId: null
+  iconPickerTargetSubjectId: null,
+  newStudentIcon: '🧒',
+  studentIconPickerTargetId: null
 };
 
 const blobUrlCache = new Map();
@@ -77,7 +97,71 @@ function createSampleJerseyBlob() {
 }
 
 // ============================================================================
-// GitHub Repository Cloud-Sync Helpers (for GitHub Pages 24/7 Sync)
+// Multi-Student Data Normalization & Migration
+// ============================================================================
+function normalizeAppData(raw) {
+  const data = raw || {};
+  let students = Array.isArray(data.students) && data.students.length > 0
+    ? data.students.map(st => ({
+        id: st.id,
+        name: st.name || 'Kind',
+        icon: st.icon || '🧒'
+      }))
+    : [
+        { id: 'student-1', name: 'Kind 1', icon: '👦' },
+        { id: 'student-2', name: 'Kind 2', icon: '👧' }
+      ];
+
+  const firstStudentId = students[0].id;
+
+  let subjects = (data.subjects || []).map(sub => ({
+    ...sub,
+    studentId: sub.studentId || firstStudentId,
+    icon: sub.icon || guessIconForSubject(sub.name)
+  }));
+
+  // Ensure every student has at least their initial subjects if none exist yet for that student
+  for (const st of students) {
+    const hasSub = subjects.some(s => s.studentId === st.id);
+    if (!hasSub) {
+      subjects = subjects.concat(createDefaultSubjectsForStudent(st.id));
+    }
+  }
+
+  // Map grades to their subject's studentId if not explicitly set
+  const subjectToStudentMap = new Map(subjects.map(s => [s.id, s.studentId]));
+  const grades = (data.grades || []).map(g => ({
+    ...g,
+    studentId: g.studentId || subjectToStudentMap.get(g.subjectId) || firstStudentId
+  }));
+
+  return { students, subjects, grades };
+}
+
+function applyNormalizedDataToState(raw) {
+  const norm = normalizeAppData(raw);
+  state.students = norm.students;
+  state.subjects = norm.subjects;
+  state.grades = norm.grades;
+
+  const savedActive = localStorage.getItem(ACTIVE_STUDENT_STORAGE_KEY);
+  if (savedActive && state.students.some(s => s.id === savedActive)) {
+    state.activeStudentId = savedActive;
+  } else if (state.students.length > 0) {
+    state.activeStudentId = state.students[0].id;
+  }
+}
+
+function getActiveStudent() {
+  return state.students.find(s => s.id === state.activeStudentId) || state.students[0] || null;
+}
+
+function getActiveSubjects() {
+  return state.subjects.filter(s => s.studentId === state.activeStudentId);
+}
+
+// ============================================================================
+// GitHub Repository Cloud-Sync Helpers
 // ============================================================================
 function loadGhConfig() {
   try {
@@ -85,7 +169,6 @@ function loadGhConfig() {
     if (!raw) return null;
     const cfg = JSON.parse(raw);
     if (cfg && cfg.repo && cfg.token) {
-      // Safeguard: never use the public "notenbuch" app shell repo for data; always use "notenbuch-daten"
       if (cfg.repo.toLowerCase().endsWith('/notenbuch')) {
         cfg.repo = `${cfg.repo}-daten`;
         localStorage.setItem(GH_SYNC_STORAGE_KEY, JSON.stringify(cfg));
@@ -108,7 +191,6 @@ function saveGhConfig(cfg) {
 }
 
 function detectRepoFromGithubPagesUrl() {
-  // Suggests "<owner>/notenbuch-daten" as the private data repository
   const host = window.location.hostname;
   if (host.endsWith('.github.io')) {
     const owner = host.replace('.github.io', '');
@@ -321,13 +403,6 @@ async function idbDeletePhoto(id) {
 // ============================================================================
 // Unified Data & Photo Storage API
 // ============================================================================
-function normalizeSubjects(subjects) {
-  return (subjects || []).map(sub => ({
-    ...sub,
-    icon: sub.icon || guessIconForSubject(sub.name)
-  }));
-}
-
 async function initStorage() {
   // 1. Check if GitHub Cloud Sync is configured
   const savedGh = loadGhConfig();
@@ -337,10 +412,14 @@ async function initStorage() {
       const remoteFile = await ghGetFile('data/notenbuch.json', savedGh);
       if (remoteFile && remoteFile.content) {
         const parsed = JSON.parse(base64ToUtf8(remoteFile.content));
-        state.subjects = normalizeSubjects(parsed.subjects);
-        state.grades = parsed.grades || [];
+        const hadStudents = Array.isArray(parsed.students) && parsed.students.length > 0;
+        applyNormalizedDataToState(parsed);
         state.storageMode = 'github';
         updateSyncBadgeUi();
+        // If we just migrated single-student data to 2 students, persist the migrated structure
+        if (!hadStudents) {
+          await persistState().catch(() => {});
+        }
         return;
       }
     } catch (err) {
@@ -355,16 +434,13 @@ async function initStorage() {
       if (res.ok) {
         state.storageMode = 'server';
         const data = await res.json();
-        state.subjects = normalizeSubjects(data.subjects);
-        state.grades = data.grades || [];
+        applyNormalizedDataToState(data);
         state.lanUrls = data.lanUrls || [];
         await ensureDemoPhotoIfNeeded();
         updateSyncBadgeUi();
         return;
       }
-    } catch (_) {
-      // Fallback to IndexedDB
-    }
+    } catch (_) {}
   }
 
   // 3. Fallback to IndexedDB
@@ -372,83 +448,23 @@ async function initStorage() {
   let data = await idbGetState();
 
   if (!data) {
-    // On public GitHub Pages without token: show only empty subjects (0 grades, 0 photos)
-    if (window.location.hostname.endsWith('.github.io')) {
-      data = {
-        subjects: [
-          { id: 'sub-deutsch', name: 'Deutsch', icon: '📖' },
-          { id: 'sub-englisch', name: 'Englisch', icon: '🇬🇧' },
-          { id: 'sub-geographie', name: 'Geographie', icon: '🌍' },
-          { id: 'sub-mathematik', name: 'Mathematik', icon: '📐' },
-          { id: 'sub-musik', name: 'Musik', icon: '🎵' }
-        ],
-        grades: []
-      };
-    } else {
-      const sampleBlob = createSampleJerseyBlob();
-      const demoPhotoId = 'photo-demo-jersey';
-      await idbSavePhoto({
-        id: demoPhotoId,
-        name: 'Kurzarbeit-Deutsch-Original.svg',
-        mimeType: 'image/svg+xml',
-        size: sampleBlob.size,
-        width: 1200,
-        height: 1200,
-        blob: sampleBlob
-      });
-
-      data = {
-        subjects: [
-          { id: 'sub-deutsch', name: 'Deutsch', icon: '📖' },
-          { id: 'sub-englisch', name: 'Englisch', icon: '🇬🇧' },
-          { id: 'sub-geographie', name: 'Geographie', icon: '🌍' },
-          { id: 'sub-mathematik', name: 'Mathematik', icon: '📐' },
-          { id: 'sub-musik', name: 'Musik', icon: '🎵' }
-        ],
-        grades: [
-          {
-            id: 'grade-1',
-            subjectId: 'sub-deutsch',
-            value: 2.0,
-            weight: 2,
-            date: '2026-10-28',
-            note: 'Probe',
-            photos: []
-          },
-          {
-            id: 'grade-2',
-            subjectId: 'sub-deutsch',
-            value: 4.0,
-            weight: 1,
-            date: '2026-10-14',
-            note: 'Kurzarbeit',
-            photos: [
-              {
-                id: demoPhotoId,
-                name: 'Kurzarbeit-Deutsch-Original.svg',
-                mimeType: 'image/svg+xml',
-                size: sampleBlob.size,
-                width: 1200,
-                height: 1200
-              }
-            ]
-          },
-          {
-            id: 'grade-3',
-            subjectId: 'sub-mathematik',
-            value: 1.0,
-            weight: 1,
-            date: '2026-10-20',
-            note: 'Schulaufgabe',
-            photos: []
-          }
-        ]
-      };
+    data = {
+      students: [
+        { id: 'student-1', name: 'Kind 1', icon: '👦' },
+        { id: 'student-2', name: 'Kind 2', icon: '👧' }
+      ],
+      subjects: [
+        ...createDefaultSubjectsForStudent('student-1'),
+        ...createDefaultSubjectsForStudent('student-2')
+      ],
+      grades: []
+    };
+    if (!window.location.hostname.endsWith('.github.io')) {
       await idbSaveState(data);
     }
   }
-  state.subjects = normalizeSubjects(data.subjects);
-  state.grades = data.grades || [];
+
+  applyNormalizedDataToState(data);
   updateSyncBadgeUi();
 }
 
@@ -471,10 +487,10 @@ async function ensureDemoPhotoIfNeeded() {
 
 async function persistState() {
   const payload = {
+    students: state.students,
     subjects: state.subjects,
     grades: state.grades
   };
-  // Always keep local IndexedDB copy up to date
   await idbSaveState(payload).catch(() => {});
 
   if (state.storageMode === 'github' && state.ghConfig) {
@@ -597,7 +613,6 @@ async function getPhotoUrl(photoMeta, forDownload = false) {
     blobUrlCache.set(photoMeta.id, url);
     return url;
   }
-  // If stored in GitHub repo (data/photos/<storedFileName>)
   if (photoMeta.storedFileName) {
     if (state.storageMode === 'github' && state.ghConfig) {
       try {
@@ -681,9 +696,10 @@ function calculateSubjectAverage(subjectId) {
   return totalWeight > 0 ? weightedSum / totalWeight : null;
 }
 
-function calculateOverallAverage() {
+function calculateOverallAverageForActiveStudent() {
+  const activeSubjects = getActiveSubjects();
   const subjectAverages = [];
-  for (const sub of state.subjects) {
+  for (const sub of activeSubjects) {
     const avg = calculateSubjectAverage(sub.id);
     if (avg !== null) {
       subjectAverages.push(avg);
@@ -906,11 +922,43 @@ function renderSubjectChartSvg(grades) {
 // ============================================================================
 // Main UI Rendering
 // ============================================================================
+function renderStudentTabs() {
+  const tabsContainer = document.getElementById('student-tabs');
+  if (!tabsContainer) return;
+  tabsContainer.innerHTML = '';
+
+  for (const st of state.students) {
+    const isActive = st.id === state.activeStudentId;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.role = 'tab';
+    btn.setAttribute('aria-selected', String(isActive));
+    btn.className = `student-tab${isActive ? ' active' : ''}`;
+    btn.innerHTML = `
+      <span class="student-tab-avatar">${escapeHtml(st.icon || '🧒')}</span>
+      <span>${escapeHtml(st.name)}</span>
+    `;
+    btn.addEventListener('click', () => {
+      state.activeStudentId = st.id;
+      localStorage.setItem(ACTIVE_STUDENT_STORAGE_KEY, st.id);
+      renderApp();
+    });
+    tabsContainer.appendChild(btn);
+  }
+}
+
 async function renderApp() {
+  renderStudentTabs();
+
+  const activeStudent = getActiveStudent();
   const overallEl = document.getElementById('overall-average');
-  const overallAvg = calculateOverallAverage();
+  const overallLabelEl = document.getElementById('overall-label');
+  const overallAvg = calculateOverallAverageForActiveStudent();
   overallEl.textContent = formatGrade(overallAvg);
   overallEl.className = `overall-score ${getGradeColorClass(overallAvg)}`;
+  if (overallLabelEl && activeStudent) {
+    overallLabelEl.textContent = `Schnitt aller Fächer (${activeStudent.name})`;
+  }
 
   const lanBanner = document.getElementById('lan-info-banner');
   const lanUrlText = document.getElementById('lan-url-text');
@@ -924,7 +972,9 @@ async function renderApp() {
   const listEl = document.getElementById('subjects-list');
   listEl.innerHTML = '';
 
-  for (const sub of state.subjects) {
+  const activeSubjects = getActiveSubjects();
+
+  for (const sub of activeSubjects) {
     const subGrades = state.grades
       .filter(g => g.subjectId === sub.id)
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -1107,6 +1157,141 @@ async function renderApp() {
 }
 
 // ============================================================================
+// Modal: Kinder / Schüler verwalten
+// ============================================================================
+function openStudentsModal() {
+  state.newStudentIcon = '🧒';
+  state.studentIconPickerTargetId = null;
+  document.getElementById('new-student-icon-btn').textContent = state.newStudentIcon;
+  document.getElementById('student-icon-picker-panel').classList.add('hidden');
+
+  renderManageStudentsList();
+  document.getElementById('students-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('new-student-input').focus(), 50);
+}
+
+function closeStudentsModal() {
+  document.getElementById('student-icon-picker-panel').classList.add('hidden');
+  document.getElementById('students-modal').classList.add('hidden');
+}
+
+function openStudentAvatarPickerFor(targetStudentId = null) {
+  state.studentIconPickerTargetId = targetStudentId;
+  const panel = document.getElementById('student-icon-picker-panel');
+  const label = document.getElementById('student-icon-picker-label');
+  const grid = document.getElementById('student-icon-picker-grid');
+
+  let currentIcon = state.newStudentIcon;
+  if (targetStudentId) {
+    const st = state.students.find(s => s.id === targetStudentId);
+    if (st) {
+      currentIcon = st.icon || '🧒';
+      label.textContent = `Avatar für "${st.name}" wählen`;
+    }
+  } else {
+    label.textContent = 'Avatar für das neue Kind wählen';
+  }
+
+  grid.innerHTML = '';
+  for (const emoji of STUDENT_AVATARS_LIST) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `icon-option-btn${emoji === currentIcon ? ' selected' : ''}`;
+    btn.textContent = emoji;
+    btn.addEventListener('click', async () => {
+      if (state.studentIconPickerTargetId) {
+        const st = state.students.find(s => s.id === state.studentIconPickerTargetId);
+        if (st) {
+          st.icon = emoji;
+          await persistState();
+          renderManageStudentsList();
+          renderApp();
+        }
+      } else {
+        state.newStudentIcon = emoji;
+        document.getElementById('new-student-icon-btn').textContent = emoji;
+      }
+      panel.classList.add('hidden');
+    });
+    grid.appendChild(btn);
+  }
+
+  panel.classList.remove('hidden');
+}
+
+function renderManageStudentsList() {
+  const container = document.getElementById('manage-students-list');
+  container.innerHTML = '';
+
+  for (const st of state.students) {
+    const stSubjects = state.subjects.filter(s => s.studentId === st.id);
+    const subIds = new Set(stSubjects.map(s => s.id));
+    const gradeCount = state.grades.filter(g => subIds.has(g.subjectId)).length;
+
+    const row = document.createElement('div');
+    row.className = 'manage-subject-item';
+    row.innerHTML = `
+      <div class="manage-subject-left">
+        <button type="button" class="manage-subject-icon-btn" title="Avatar ändern">${escapeHtml(st.icon || '🧒')}</button>
+        <div>
+          <div class="manage-subject-name">${escapeHtml(st.name)}</div>
+          <div class="subject-count">${stSubjects.length} Fächer · ${gradeCount === 1 ? '1 Note' : `${gradeCount} Noten`}</div>
+        </div>
+      </div>
+      <div class="manage-subject-actions">
+        <button type="button" class="btn btn-secondary btn-sm btn-rename-student">Umbenennen</button>
+        ${
+          state.students.length > 1
+            ? `<button type="button" class="btn btn-danger-outline btn-sm btn-delete-student">Löschen</button>`
+            : ''
+        }
+      </div>
+    `;
+
+    row.querySelector('.manage-subject-icon-btn').addEventListener('click', () => {
+      openStudentAvatarPickerFor(st.id);
+    });
+
+    row.querySelector('.btn-rename-student').addEventListener('click', async () => {
+      const newName = prompt('Name des Kindes:', st.name);
+      if (newName && newName.trim()) {
+        st.name = newName.trim();
+        await persistState();
+        renderManageStudentsList();
+        renderApp();
+      }
+    });
+
+    const delBtn = row.querySelector('.btn-delete-student');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (confirm(`Möchtest du "${st.name}" inklusive aller zugehörigen Fächer und ${gradeCount} Note(n) wirklich löschen?`)) {
+          const stSubIds = new Set(state.subjects.filter(s => s.studentId === st.id).map(s => s.id));
+          const stGrades = state.grades.filter(g => stSubIds.has(g.subjectId));
+          for (const g of stGrades) {
+            for (const p of g.photos || []) {
+              await deleteStoredPhoto(p.id, p.storedFileName);
+            }
+          }
+          state.grades = state.grades.filter(g => !stSubIds.has(g.subjectId));
+          state.subjects = state.subjects.filter(s => s.studentId !== st.id);
+          state.students = state.students.filter(s => s.id !== st.id);
+          if (state.activeStudentId === st.id && state.students.length > 0) {
+            state.activeStudentId = state.students[0].id;
+            localStorage.setItem(ACTIVE_STUDENT_STORAGE_KEY, state.activeStudentId);
+          }
+          await persistState();
+          renderManageStudentsList();
+          renderApp();
+        }
+      });
+    }
+
+    container.appendChild(row);
+  }
+}
+
+// ============================================================================
 // Modal: Note eintragen / Note bearbeiten
 // ============================================================================
 function setWeightSelection(weight) {
@@ -1129,7 +1314,10 @@ async function openGradeModal({ editGrade = null, preselectSubjectId = null } = 
   errorEl.classList.add('hidden');
   errorEl.textContent = '';
 
-  subjectSelect.innerHTML = state.subjects
+  const activeStudent = getActiveStudent();
+  const activeSubjects = getActiveSubjects();
+
+  subjectSelect.innerHTML = activeSubjects
     .map(s => {
       const icon = s.icon || guessIconForSubject(s.name);
       return `<option value="${s.id}">${escapeHtml(icon)} ${escapeHtml(s.name)}</option>`;
@@ -1140,7 +1328,7 @@ async function openGradeModal({ editGrade = null, preselectSubjectId = null } = 
   state.removedPhotoIds = [];
 
   if (editGrade) {
-    titleEl.textContent = 'Note bearbeiten';
+    titleEl.textContent = activeStudent ? `Note bearbeiten (${activeStudent.name})` : 'Note bearbeiten';
     idInput.value = editGrade.id;
     subjectSelect.value = editGrade.subjectId;
     valueInput.value = String(editGrade.value).replace('.', ',');
@@ -1157,7 +1345,7 @@ async function openGradeModal({ editGrade = null, preselectSubjectId = null } = 
       });
     }
   } else {
-    titleEl.textContent = 'Note eintragen';
+    titleEl.textContent = activeStudent ? `Note eintragen (${activeStudent.name})` : 'Note eintragen';
     idInput.value = '';
     if (preselectSubjectId) {
       subjectSelect.value = preselectSubjectId;
@@ -1218,9 +1406,14 @@ function renderModalPhotoGrid() {
 }
 
 // ============================================================================
-// Modal: Fächer verwalten (Icons + Drag & Drop Sortierung)
+// Modal: Fächer verwalten (pro Kind, mit Icons & Drag-and-Drop Sortierung)
 // ============================================================================
 function openSubjectsModal() {
+  const activeStudent = getActiveStudent();
+  document.getElementById('subjects-modal-title').textContent = activeStudent
+    ? `Fächer verwalten (${activeStudent.name})`
+    : 'Fächer verwalten';
+
   state.newSubjectIcon = '📚';
   state.newSubjectIconManuallyChosen = false;
   state.iconPickerTargetSubjectId = null;
@@ -1286,7 +1479,9 @@ function renderManageSubjectsList() {
   const container = document.getElementById('manage-subjects-list');
   container.innerHTML = '';
 
-  for (const sub of state.subjects) {
+  const activeSubjects = getActiveSubjects();
+
+  for (const sub of activeSubjects) {
     const gradeCount = state.grades.filter(g => g.subjectId === sub.id).length;
     const icon = sub.icon || guessIconForSubject(sub.name);
 
@@ -1449,8 +1644,49 @@ document.addEventListener('DOMContentLoaded', async () => {
   await initStorage();
   await renderApp();
 
+  document.getElementById('btn-manage-students').addEventListener('click', () => {
+    openStudentsModal();
+  });
+
+  document.getElementById('btn-close-students').addEventListener('click', closeStudentsModal);
+
+  document.getElementById('new-student-icon-btn').addEventListener('click', () => {
+    openStudentAvatarPickerFor(null);
+  });
+
+  document.getElementById('btn-close-student-icon-picker').addEventListener('click', () => {
+    document.getElementById('student-icon-picker-panel').classList.add('hidden');
+  });
+
+  document.getElementById('add-student-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const input = document.getElementById('new-student-input');
+    const name = input.value.trim();
+    if (!name) return;
+
+    const studentId = `student-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    const newStudent = {
+      id: studentId,
+      name,
+      icon: state.newStudentIcon || '🧒'
+    };
+    state.students.push(newStudent);
+    state.subjects.push(...createDefaultSubjectsForStudent(studentId));
+    state.activeStudentId = studentId;
+    localStorage.setItem(ACTIVE_STUDENT_STORAGE_KEY, studentId);
+
+    input.value = '';
+    state.newStudentIcon = '🧒';
+    document.getElementById('new-student-icon-btn').textContent = '🧒';
+    document.getElementById('student-icon-picker-panel').classList.add('hidden');
+
+    await persistState();
+    renderManageStudentsList();
+    renderApp();
+  });
+
   document.getElementById('btn-add-grade').addEventListener('click', () => {
-    if (state.subjects.length === 0) {
+    if (getActiveSubjects().length === 0) {
       openSubjectsModal();
       return;
     }
@@ -1487,7 +1723,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveBtn = document.getElementById('btn-save-sync');
 
     if (!repo.includes('/') || !token) {
-      statusEl.textContent = 'Bitte gib dein Repository (z. B. nutzername/notenbuch) und deinen Token ein.';
+      statusEl.textContent = 'Bitte gib dein Repository (z. B. tarikidi/notenbuch-daten) und deinen Token ein.';
       statusEl.classList.remove('hidden');
       return;
     }
@@ -1503,7 +1739,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         ? JSON.parse(base64ToUtf8(existing.content))
         : null;
 
-      // Check if local server (/api/state) has grades we should migrate
       let localServerData = null;
       if (!window.location.hostname.endsWith('.github.io')) {
         try {
@@ -1521,13 +1756,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       state.storageMode = 'github';
 
       if (remoteGradesCount > 0 && localGradesCount === 0) {
-        state.subjects = normalizeSubjects(parsedRemote.subjects);
-        state.grades = parsedRemote.grades || [];
+        applyNormalizedDataToState(parsedRemote);
       } else if (localGradesCount > 0 && remoteGradesCount === 0) {
-        // Upload local grades & photos into the private GitHub repository
         if (localServerData) {
-          state.subjects = normalizeSubjects(localServerData.subjects);
-          state.grades = localServerData.grades || [];
+          applyNormalizedDataToState(localServerData);
         }
         saveBtn.textContent = 'Lade lokale Fotos hoch...';
         for (const grade of state.grades) {
@@ -1565,8 +1797,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveBtn.textContent = 'Speichere Noten...';
         await persistState();
       } else if (parsedRemote) {
-        state.subjects = normalizeSubjects(parsedRemote.subjects);
-        state.grades = parsedRemote.grades || [];
+        applyNormalizedDataToState(parsedRemote);
       } else {
         await persistState();
       }
@@ -1655,6 +1886,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             id: item.id,
             name: item.name,
             storedFileName: item.storedFileName,
+            sha: item.sha,
             size: item.size,
             mimeType: item.mimeType,
             width: item.width,
@@ -1672,6 +1904,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (idx !== -1) {
           state.grades[idx] = {
             ...state.grades[idx],
+            studentId: state.activeStudentId,
             subjectId,
             value: gradeVal,
             weight: state.selectedWeight,
@@ -1683,6 +1916,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else {
         state.grades.push({
           id: `grade-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          studentId: state.activeStudentId,
           subjectId,
           value: gradeVal,
           weight: state.selectedWeight,
@@ -1731,8 +1965,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const name = newSubjectInput.value.trim();
     if (!name) return;
 
-    if (state.subjects.some(s => s.name.toLowerCase() === name.toLowerCase())) {
-      alert('Dieses Fach existiert bereits.');
+    const activeSubjects = getActiveSubjects();
+    if (activeSubjects.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+      alert('Dieses Fach existiert für dieses Kind bereits.');
       return;
     }
 
@@ -1742,6 +1977,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const newSub = {
       id: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      studentId: state.activeStudentId,
       name,
       icon
     };
@@ -1765,6 +2001,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (e.target === backdrop) {
         if (backdrop.id === 'grade-modal') closeGradeModal();
         if (backdrop.id === 'subjects-modal') closeSubjectsModal();
+        if (backdrop.id === 'students-modal') closeStudentsModal();
         if (backdrop.id === 'sync-modal') closeSyncModal();
         if (backdrop.id === 'lightbox-modal') closeLightbox();
       }
@@ -1776,6 +2013,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       closeLightbox();
       closeGradeModal();
       closeSubjectsModal();
+      closeStudentsModal();
       closeSyncModal();
     }
   });

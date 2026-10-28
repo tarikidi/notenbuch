@@ -24,9 +24,19 @@
         </button>
       </div>
 
+      <!-- Student / Child Switcher Tabs -->
+      <div class="students-bar" role="tablist" aria-label="Schüler auswählen">
+        <div id="student-tabs" class="student-tabs">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+        <button id="btn-manage-students" class="btn-manage-students" type="button" title="Kinder / Schüler verwalten (Namen ändern oder hinzufügen)">
+          ✎ Kinder
+        </button>
+      </div>
+
       <div class="overall-stats">
         <span id="overall-average" class="overall-score">–</span>
-        <span class="overall-label">Schnitt aller Fächer</span>
+        <span id="overall-label" class="overall-label">Schnitt aller Fächer</span>
       </div>
 
       <div class="header-actions">
@@ -48,6 +58,52 @@
       <span>📱 Smartphone im WLAN:</span>
       <code id="lan-url-text"></code>
     </footer>
+  </div>
+
+  <!-- Modal: Kinder / Schüler verwalten -->
+  <div id="students-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="students-modal-title">
+    <div class="modal-card">
+      <h2 id="students-modal-title" class="modal-title">Kinder verwalten</h2>
+
+      <form id="add-student-form" class="add-subject-form">
+        <div class="add-subject-row">
+          <button
+            type="button"
+            id="new-student-icon-btn"
+            class="icon-trigger-btn"
+            title="Avatar für das Kind wählen"
+          >
+            🧒
+          </button>
+          <input
+            type="text"
+            id="new-student-input"
+            class="form-control"
+            placeholder="Name des Kindes ..."
+            required
+          />
+          <button type="submit" class="btn btn-primary">Hinzufügen</button>
+        </div>
+
+        <div id="student-icon-picker-panel" class="icon-picker-panel hidden">
+          <div class="icon-picker-header">
+            <span class="icon-picker-title" id="student-icon-picker-label">Avatar auswählen</span>
+            <button type="button" id="btn-close-student-icon-picker" class="icon-picker-close">×</button>
+          </div>
+          <div id="student-icon-picker-grid" class="icon-picker-grid"></div>
+        </div>
+      </form>
+
+      <p class="drag-hint">💡 Tipp: Klicke auf „Umbenennen“, um den Namen anzupassen, oder auf das Avatar-Icon, um es zu ändern.</p>
+
+      <div id="manage-students-list" class="manage-subjects-list">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-close-students" class="btn btn-secondary">Schließen</button>
+      </div>
+    </div>
   </div>
 
   <!-- Modal: Note eintragen / Note bearbeiten -->
@@ -193,7 +249,7 @@
             type="text"
             id="gh-repo-input"
             class="form-control"
-            placeholder="z. B. tarik/notenbuch-daten"
+            placeholder="z. B. tarikidi/notenbuch-daten"
             required
           />
         </div>
