@@ -965,16 +965,6 @@ function renderStudentTabs() {
 async function renderApp() {
   renderStudentTabs();
 
-  const activeStudent = getActiveStudent();
-  const overallEl = document.getElementById('overall-average');
-  const overallLabelEl = document.getElementById('overall-label');
-  const overallAvg = calculateOverallAverageForActiveStudent();
-  overallEl.textContent = formatGrade(overallAvg);
-  overallEl.className = `overall-score ${getGradeColorClass(overallAvg)}`;
-  if (overallLabelEl && activeStudent) {
-    overallLabelEl.textContent = `Schnitt aller Fächer (${activeStudent.name})`;
-  }
-
   const lanBanner = document.getElementById('lan-info-banner');
   const lanUrlText = document.getElementById('lan-url-text');
   if (state.lanUrls && state.lanUrls.length > 0) {
