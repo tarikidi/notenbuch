@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notenbuch 2.0 – Alle Noten der Familie an einem Ort</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=2.0" />
+  <!-- Local client-side QR Code generator (runs 100% in browser) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-top-bar">
+        <div>
+          <div class="title-with-badge">
+            <h1 class="app-title">Notenbuch</h1>
+            <span class="version-pill">2.0</span>
+          </div>
+          <p class="app-subtitle">Alle Noten der Familie an einem Ort.</p>
+        </div>
+        <div class="header-top-controls">
+          <button
+            id="btn-qr-login"
+            class="btn-qr-pill"
+            type="button"
+            title="Familien-QR-Code anzeigen & Geräte koppeln"
+            aria-label="Familien-QR-Code"
+          >
+            <span>📱 QR-Login</span>
+          </button>
+          <button
+            id="btn-theme-toggle"
+            class="btn-icon-circle"
+            type="button"
+            title="Hell-/Dunkelmodus umschalten"
+            aria-label="Hell-/Dunkelmodus umschalten"
+          >
+            ☀️
+          </button>
+          <button
+            id="btn-cloud-sync"
+            class="btn-sync-dot-only"
+            type="button"
+            title="Cloud-Speicher & Verschlüsselung Einstellungen"
+            aria-label="Cloud-Sync Einstellungen"
+          >
+            <span id="sync-status-dot" class="sync-dot"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Student / Child Switcher Cards -->
+      <div class="students-switcher-wrap">
+        <div id="student-tabs" class="student-cards-row" role="tablist" aria-label="Kind auswählen">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+        <button
+          id="btn-manage-students"
+          class="btn-students-plus"
+          type="button"
+          title="Kinder verwalten / Kind hinzufügen"
+          aria-label="Kinder verwalten"
+        >+</button>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-manage-subjects" class="btn btn-secondary" type="button">
+          Fächer verwalten
+        </button>
+        <button id="btn-add-grade" class="btn btn-primary" type="button">
+          Note eintragen
+        </button>
+      </div>
+    </header>
+
+    <!-- Subject Accordion List (Drag & Drop sortable) -->
+    <main id="subjects-list" class="subjects-list" aria-label="Fächerübersicht">
+      <!-- Rendered dynamically by app.js -->
+    </main>
+
+    <!-- Changelog / Backup History Panel (per Child) -->
+    <section id="changelog-card" class="changelog-card" aria-label="Änderungsprotokoll und Backup">
+      <button type="button" id="changelog-toggle-btn" class="changelog-header" aria-expanded="false">
+        <div class="changelog-header-left">
+          <span class="changelog-icon" aria-hidden="true">🛡️</span>
+          <div>
+            <span class="changelog-title">Änderungsprotokoll &amp; Backup</span>
+            <span id="changelog-count" class="changelog-subtitle">0 Einträge</span>
+          </div>
+        </div>
+        <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+
+      <div id="changelog-body" class="changelog-body">
+        <div class="changelog-toolbar">
+          <span class="changelog-hint">Alle Änderungen werden automatisch Ende-zu-Ende-verschlüsselt protokolliert.</span>
+          <div class="changelog-export-btns">
+            <button type="button" id="btn-export-csv" class="btn btn-secondary btn-sm" title="Protokoll als CSV herunterladen">⬇ CSV</button>
+            <button type="button" id="btn-export-json" class="btn btn-secondary btn-sm" title="Komplettes Backup als JSON herunterladen">⬇ JSON</button>
+          </div>
+        </div>
+        <div id="changelog-list" class="changelog-list">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+      </div>
+    </section>
+
+    <footer id="lan-info-banner" class="lan-info-banner hidden">
+      <span>📱 Smartphone im WLAN:</span>
+      <code id="lan-url-text"></code>
+    </footer>
+  </div>
+
+  <!-- Modal: Familien-QR-Code & Schneller Geräte-Login (2.0 Feature) -->
+  <div id="qr-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title">
+    <div class="modal-card">
+      <h2 id="qr-modal-title" class="modal-title">📱 Familien-QR-Code &amp; Schlüssel</h2>
+      <p class="sync-desc">
+        Scanne diesen QR-Code mit einem zweiten Smartphone (z. B. Ehepartner) oder speichere ihn als Bild, falls du mal den Browser-Cache löschst.
+      </p>
+
+      <div class="qr-box-container">
+        <div id="qr-code-display" class="qr-code-box" aria-label="Familien Login QR-Code"></div>
+        <div class="qr-family-info">
+          <span class="qr-family-badge" id="qr-family-id-label">Familien-ID: –</span>
+          <span class="qr-e2ee-badge">🔒 Ende-zu-Ende verschlüsselt (AES-256)</span>
+        </div>
+      </div>
+
+      <div class="qr-actions-grid">
+        <button type="button" id="btn-download-qr" class="btn btn-primary btn-sm">
+          💾 QR-Karte als Bild speichern
+        </button>
+        <button type="button" id="btn-copy-qr-link" class="btn btn-secondary btn-sm">
+          📋 Login-Link kopieren
+        </button>
+      </div>
+
+      <div class="qr-new-family-section">
+        <details class="qr-details">
+          <summary>Eigenen Schlüssel eingeben oder neues Familien-Konto starten</summary>
+          <div class="qr-details-body">
+            <label for="manual-qr-link-input" class="form-label">Gespeicherten Familien-Link oder Code einfügen</label>
+            <div class="add-subject-row">
+              <input
+                type="text"
+                id="manual-qr-link-input"
+                class="form-control"
+                placeholder="Link oder Schlüssel hier einfügen..."
+              />
+              <button type="button" id="btn-apply-manual-key" class="btn btn-secondary btn-sm">Laden</button>
+            </div>
+            <div class="qr-reset-row">
+              <button type="button" id="btn-generate-new-family" class="btn btn-danger-outline btn-sm">
+                🔄 Komplett neues Familien-Notenbuch erzeugen
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-close-qr" class="btn btn-secondary">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Kinder / Schüler verwalten -->
+  <div id="students-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="students-modal-title">
+    <div class="modal-card">
+      <h2 id="students-modal-title" class="modal-title">Kinder verwalten</h2>
+      <p class="sync-desc">
+        Hier kannst du die Namen und Avatare deiner Kinder direkt anpassen oder ein weiteres Kind hinzufügen.
+      </p>
+
+      <div id="manage-students-list" class="manage-students-list">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div id="student-icon-picker-panel" class="icon-picker-panel hidden">
+        <div class="icon-picker-header">
+          <span class="icon-picker-title" id="student-icon-picker-label">Avatar auswählen</span>
+          <button type="button" id="btn-close-student-icon-picker" class="icon-picker-close">×</button>
+        </div>
+        <div id="student-icon-picker-grid" class="icon-picker-grid"></div>
+      </div>
+
+      <form id="add-student-form" class="add-student-box">
+        <label class="form-label">Weiteres Kind hinzufügen</label>
+        <div class="add-subject-row">
+          <button
+            type="button"
+            id="new-student-icon-btn"
+            class="icon-trigger-btn"
+            title="Avatar für das neue Kind wählen"
+          >
+            🧒
+          </button>
+          <input
+            type="text"
+            id="new-student-input"
+            class="form-control"
+            placeholder="Name (z. B. Muhammed, Sevde ...)"
+            required
+          />
+          <button type="submit" class="btn btn-primary">Anlegen</button>
+        </div>
+      </form>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-close-students" class="btn btn-primary">Fertig</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Note eintragen / Note bearbeiten -->
+  <div id="grade-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="grade-modal-title">
+    <div class="modal-card">
+      <h2 id="grade-modal-title" class="modal-title">Note eintragen</h2>
+      <form id="grade-form" novalidate>
+        <input type="hidden" id="grade-id-input" />
+
+        <div class="form-group">
+          <label for="grade-subject-select" class="form-label">Fach</label>
+          <div class="select-wrapper">
+            <select id="grade-subject-select" class="form-control" required></select>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="grade-value-input" class="form-label">Note (1 bis 6)</label>
+            <input
+              type="text"
+              inputmode="decimal"
+              id="grade-value-input"
+              class="form-control"
+              placeholder="z. B. 2 oder 2,5"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="grade-date-input" class="form-label">Geschrieben am</label>
+            <input
+              type="date"
+              id="grade-date-input"
+              class="form-control"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Gewichtung</label>
+          <div class="weight-toggle" role="group" aria-label="Gewichtung wählen">
+            <button type="button" class="weight-btn active" data-weight="1">1×</button>
+            <button type="button" class="weight-btn" data-weight="2">2×</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="grade-note-input" class="form-label">Art oder Notiz (optional)</label>
+          <input
+            type="text"
+            id="grade-note-input"
+            class="form-control"
+            placeholder="z. B. Schulaufgabe, Ex, Test"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fotos der Schulaufgabe <span class="label-hint">(Originalgröße)</span></label>
+          <div id="modal-photo-grid" class="photo-upload-grid">
+            <label for="grade-photo-input" class="photo-add-tile" title="Foto in Originalgröße auswählen">
+              <span>Foto<br>hinzufügen</span>
+            </label>
+          </div>
+          <input
+            type="file"
+            id="grade-photo-input"
+            accept="image/*"
+            multiple
+            class="sr-only"
+          />
+        </div>
+
+        <div id="grade-form-error" class="form-error hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-grade" class="btn btn-secondary">Abbrechen</button>
+          <button type="submit" id="btn-save-grade" class="btn btn-primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Fächer verwalten (mit Icons & Drag-and-Drop Sortierung) -->
+  <div id="subjects-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="subjects-modal-title">
+    <div class="modal-card">
+      <h2 id="subjects-modal-title" class="modal-title">Fächer verwalten</h2>
+
+      <form id="add-subject-form" class="add-subject-form">
+        <div class="add-subject-row">
+          <button
+            type="button"
+            id="new-subject-icon-btn"
+            class="icon-trigger-btn"
+            title="Icon für das neue Fach wählen"
+          >
+            📚
+          </button>
+          <input
+            type="text"
+            id="new-subject-input"
+            class="form-control"
+            placeholder="Neues Fach (z. B. Biologie, Kunst ...)"
+            required
+          />
+          <button type="submit" class="btn btn-primary">Hinzufügen</button>
+        </div>
+
+        <div id="icon-picker-panel" class="icon-picker-panel hidden">
+          <div class="icon-picker-header">
+            <span class="icon-picker-title" id="icon-picker-label">Icon auswählen</span>
+            <button type="button" id="btn-close-icon-picker" class="icon-picker-close">×</button>
+          </div>
+          <div id="icon-picker-grid" class="icon-picker-grid"></div>
+        </div>
+      </form>
+
+      <p class="drag-hint">💡 Tipp: Fächer per Drag &amp; Drop am Griff <code>⋮⋮</code> sortieren oder aufs Icon klicken, um es zu ändern.</p>
+
+      <div id="manage-subjects-list" class="manage-subjects-list">
+        <!-- Populated dynamically -->
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-close-subjects" class="btn btn-secondary">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cloud-Speicher & Verschlüsselung Einstellungen -->
+  <div id="sync-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sync-modal-title">
+    <div class="modal-card">
+      <h2 id="sync-modal-title" class="modal-title">🔒 Cloud-Sync &amp; Verschlüsselung (2.0)</h2>
+      <p class="sync-desc">
+        In Version 2.0 enthält dein <strong>📱 QR-Login</strong> automatisch alle Zugangsdaten und deinen Ende-zu-Ende-Schlüssel (<code>AES-256</code>).
+      </p>
+
+      <form id="sync-form" novalidate>
+        <div class="form-group">
+          <label for="gh-repo-input" class="form-label">Privates Daten-Repository (Nutzername/Repo)</label>
+          <input
+            type="text"
+            id="gh-repo-input"
+            class="form-control"
+            placeholder="z. B. tarikidi/notenbuch-daten"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="gh-branch-input" class="form-label">Branch</label>
+          <input
+            type="text"
+            id="gh-branch-input"
+            class="form-control"
+            placeholder="main"
+            value="main"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="gh-token-input" class="form-label">GitHub Personal Access Token</label>
+          <input
+            type="password"
+            id="gh-token-input"
+            class="form-control"
+            placeholder="ghp_... oder github_pat_..."
+            required
+          />
+          <span class="field-help">
+            Tipp: Sobald einmal verbunden, kannst du jedes weitere Gerät einfach über den Button <strong>📱 QR-Login</strong> oben rechts per Handykamera einloggen!
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-row">
+            <input type="checkbox" id="gh-e2ee-checkbox" />
+            <span><strong>Ende-zu-Ende-Verschlüsselung (AES-256)</strong> aktivieren (verschlüsselt Daten &amp; Fotos vor dem Hochladen mit deinem QR-Schlüssel)</span>
+          </label>
+        </div>
+
+        <div id="sync-form-status" class="form-error hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-disconnect-sync" class="btn btn-danger-outline hidden">Trennen</button>
+          <button type="button" id="btn-close-sync" class="btn btn-secondary">Schließen</button>
+          <button type="submit" id="btn-save-sync" class="btn btn-primary">Verbinden &amp; Synchronisieren</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lightbox Modal: Foto in Originalgröße ansehen & herunterladen -->
+  <div id="lightbox-modal" class="modal-backdrop lightbox-backdrop hidden" role="dialog" aria-modal="true" aria-label="Foto in Originalgröße">
+    <div class="lightbox-container">
+      <div class="lightbox-header">
+        <div class="lightbox-meta">
+          <span id="lightbox-filename" class="lightbox-title">Foto</span>
+          <span id="lightbox-details" class="lightbox-subtitle">Originalgröße</span>
+        </div>
+        <div class="lightbox-actions">
+          <a id="lightbox-download-btn" class="btn btn-primary btn-sm" href="#" download>
+            ⬇ Original herunterladen
+          </a>
+          <button type="button" id="btn-close-lightbox" class="btn btn-secondary btn-sm">
+            Schließen
+          </button>
+        </div>
+      </div>
+      <div class="lightbox-body">
+        <img id="lightbox-img" src="" alt="Schulaufgabe in Originalgröße" />
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2.0"></script>
+</body>
+</html>
