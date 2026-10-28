@@ -1252,6 +1252,8 @@ async function renderApp() {
           ? `<span class="weight-pill">${Number(grade.weight)}×</span>`
           : '';
 
+        const deviceBadge = `<span class="changelog-device-badge" title="Eingetragen / bearbeitet von">📱 ${escapeHtml(grade.deviceName || 'Hauptgerät')}</span>`;
+
         itemEl.innerHTML = `
           <div class="grade-item-main">
             <div class="grade-item-left">
@@ -1262,6 +1264,7 @@ async function renderApp() {
                 <div class="grade-date-row">
                   <span class="grade-date">${formatGermanDateLong(grade.date)}</span>
                   ${weightBadge}
+                  ${deviceBadge}
                 </div>
                 ${subtitleHtml}
               </div>
@@ -2304,7 +2307,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             weight: state.selectedWeight,
             date: dateVal,
             note: noteVal,
-            photos: finalPhotos
+            photos: finalPhotos,
+            deviceId: getOrCreateDeviceId(),
+            deviceName: getDeviceName()
           };
           state.grades[idx] = updatedGrade;
           recordAuditLog({
@@ -2324,7 +2329,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           weight: state.selectedWeight,
           date: dateVal,
           note: noteVal,
-          photos: finalPhotos
+          photos: finalPhotos,
+          deviceId: getOrCreateDeviceId(),
+          deviceName: getDeviceName()
         };
         state.grades.push(newGrade);
         recordAuditLog({
@@ -2431,10 +2438,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             updatedAny = true;
           }
         }
+        for (const grade of state.grades) {
+          if (grade.deviceId === myDeviceId) {
+            grade.deviceName = newName;
+            updatedAny = true;
+          }
+        }
         if (updatedAny) {
           await persistState().catch(() => {});
         }
-        renderChangelogSection();
+        renderApp();
       }
     });
   }
