@@ -2134,6 +2134,7 @@ function openQrModal() {
   const displayEl = document.getElementById('qr-code-display');
   const famLabelEl = document.getElementById('qr-family-id-label');
   const manualInput = document.getElementById('manual-qr-link-input');
+  const returnMainBox = document.getElementById('qr-return-main-box');
 
   const fam = state.familyIdentity || loadOrCreateFamilyIdentity();
   const loginUrl = buildQrLoginUrl();
@@ -2141,6 +2142,9 @@ function openQrModal() {
   if (famLabelEl) {
     const modeNote = fam.isCustomFamily ? 'Isolierter Familien-Tresor' : 'Hauptkonto';
     famLabelEl.textContent = `Familien-ID: ${fam.familyId} (${modeNote})`;
+  }
+  if (returnMainBox) {
+    returnMainBox.classList.toggle('hidden', !fam.isCustomFamily);
   }
   if (manualInput) {
     manualInput.value = '';
@@ -2156,6 +2160,23 @@ function openQrModal() {
   }
 
   modal.classList.remove('hidden');
+}
+
+async function switchBackToMainFamily() {
+  const fam = state.familyIdentity || loadOrCreateFamilyIdentity();
+  saveFamilyIdentity({
+    familyId: fam.mainFamilyId || 'fam-hauptkonto',
+    familyKey: fam.mainFamilyKey || fam.familyKey || generateRandomAesKeyBase64(),
+    isCustomFamily: false
+  });
+  if (state.ghConfig) {
+    state.ghConfig.e2ee = false;
+    saveGhConfig(state.ghConfig);
+  }
+  state.expandedSubjectIds.clear();
+  await initStorage();
+  await renderApp();
+  closeQrModal();
 }
 
 function closeQrModal() {
@@ -2447,19 +2468,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+  const switchMainBtn = document.getElementById('btn-switch-main-family');
+  if (switchMainBtn) {
+    switchMainBtn.addEventListener('click', switchBackToMainFamily);
+  }
+  const switchMainSubBtn = document.getElementById('btn-switch-main-family-sub');
+  if (switchMainSubBtn) {
+    switchMainSubBtn.addEventListener('click', switchBackToMainFamily);
+  }
   const genNewFamilyBtn = document.getElementById('btn-generate-new-family');
   if (genNewFamilyBtn) {
     genNewFamilyBtn.addEventListener('click', async () => {
       const ok = confirm(
-        'Möchtest du ein komplett neues, isoliertes Familien-Notenbuch mit eigenem AES-256 Schlüssel und eigenem QR-Code erzeugen?\n\n' +
-        'Ideal, wenn eine andere Familie (z. B. aus der Klasse) ihr eigenes verschlüsseltes Notenbuch nutzen möchte.'
+        'Möchtest du ein neues, isoliertes Familien-Notenbuch für eine andere Familie erzeugen?\n\n' +
+        'Hinweis: Deine eigenen Daten im Haupt-Notenbuch bleiben erhalten! Du kannst jederzeit über „🏠 Zurück zu meinem Haupt-Notenbuch“ wieder zurückwechseln.'
       );
       if (!ok) return;
 
+      const prevFam = state.familyIdentity || loadOrCreateFamilyIdentity();
       const newIdentity = {
         familyId: `fam-${generateRandomHex(4)}`,
         familyKey: generateRandomAesKeyBase64(),
-        isCustomFamily: true
+        isCustomFamily: true,
+        mainFamilyId: prevFam.isCustomFamily ? (prevFam.mainFamilyId || 'fam-hauptkonto') : prevFam.familyId,
+        mainFamilyKey: prevFam.isCustomFamily ? (prevFam.mainFamilyKey || prevFam.familyKey) : prevFam.familyKey
       };
       saveFamilyIdentity(newIdentity);
 

@@ -1657,3 +1657,24 @@ input[type="date"].form-control {
   accent-color: var(--accent-primary);
   flex-shrink: 0;
 }
+
+.qr-return-main-box {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qr-return-main-box.hidden {
+  display: none;
+}
+
+.qr-return-hint {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  text-align: center;
+}

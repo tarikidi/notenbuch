@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.0" />
+  <link rel="stylesheet" href="styles.css?v=2.1" />
   <!-- Local client-side QR Code generator (runs 100% in browser) -->
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 </head>
@@ -143,6 +143,13 @@
         </button>
       </div>
 
+      <div id="qr-return-main-box" class="qr-return-main-box hidden">
+        <p class="qr-return-hint">Du befindest dich aktuell in einem neu erzeugten Zweit-/Test-Familienkonto.</p>
+        <button type="button" id="btn-switch-main-family" class="btn btn-primary btn-sm" style="width:100%;">
+          🏠 Zurück zu meinem Haupt-Notenbuch (Eigene Daten laden)
+        </button>
+      </div>
+
       <div class="qr-new-family-section">
         <details class="qr-details">
           <summary>Eigenen Schlüssel eingeben oder neues Familien-Konto starten</summary>
@@ -157,9 +164,12 @@
               />
               <button type="button" id="btn-apply-manual-key" class="btn btn-secondary btn-sm">Laden</button>
             </div>
-            <div class="qr-reset-row">
+            <div class="qr-reset-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" id="btn-switch-main-family-sub" class="btn btn-secondary btn-sm">
+                🏠 Haupt-Notenbuch laden
+              </button>
               <button type="button" id="btn-generate-new-family" class="btn btn-danger-outline btn-sm">
-                🔄 Komplett neues Familien-Notenbuch erzeugen
+                🔄 Neues Familien-Notenbuch (für andere Familie)
               </button>
             </div>
           </div>
@@ -434,6 +444,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=2.0"></script>
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>
