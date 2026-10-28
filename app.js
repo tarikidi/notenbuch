@@ -145,6 +145,34 @@ function base64ToUtf8(b64) {
   return decodeURIComponent(escape(atob(b64.replace(/\s/g, ''))));
 }
 
+function base64ToBlob(b64, mimeType = 'image/jpeg') {
+  const clean = b64.replace(/\s/g, '');
+  const byteChars = atob(clean);
+  const byteArrays = [];
+  const sliceSize = 0x8000;
+  for (let offset = 0; offset < byteChars.length; offset += sliceSize) {
+    const slice = byteChars.slice(offset, offset + sliceSize);
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    byteArrays.push(new Uint8Array(byteNumbers));
+  }
+  return new Blob(byteArrays, { type: mimeType });
+}
+
+async function ghGetBlob(sha, cfg = state.ghConfig) {
+  const url = `https://api.github.com/repos/${cfg.repo}/git/blobs/${sha}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${cfg.token}`,
+      Accept: 'application/vnd.github.v3+json'
+    }
+  });
+  if (!res.ok) throw new Error(`GitHub Blob Fehler (${res.status})`);
+  return await res.json();
+}
+
 async function ghGetFile(repoPath, cfg = state.ghConfig) {
   const url = `https://api.github.com/repos/${cfg.repo}/contents/${repoPath}?ref=${encodeURIComponent(cfg.branch || 'main')}&t=${Date.now()}`;
   const res = await fetch(url, {
@@ -488,7 +516,7 @@ async function uploadOriginalPhotoFile(file, knownWidth = null, knownHeight = nu
     const arrayBuf = await file.arrayBuffer();
     const b64 = arrayBufferToBase64(arrayBuf);
 
-    await ghPutFile(
+    const putRes = await ghPutFile(
       `data/photos/${storedFileName}`,
       b64,
       `Foto hochgeladen: ${file.name || storedFileName}`
@@ -498,6 +526,7 @@ async function uploadOriginalPhotoFile(file, knownWidth = null, knownHeight = nu
       id: photoId,
       name: file.name || 'Foto.jpg',
       storedFileName,
+      sha: putRes && putRes.content ? putRes.content.sha : undefined,
       mimeType: file.type || 'image/jpeg',
       size: file.size,
       width,
@@ -565,17 +594,27 @@ async function getPhotoUrl(photoMeta, forDownload = false) {
   if (photoMeta.storedFileName) {
     if (state.storageMode === 'github' && state.ghConfig) {
       try {
-        const fileData = await ghGetFile(`data/photos/${photoMeta.storedFileName}`);
-        if (fileData && fileData.download_url) {
-          const rawRes = await fetch(fileData.download_url);
-          if (rawRes.ok) {
-            const blob = await rawRes.blob();
+        let sha = photoMeta.sha;
+        if (!sha) {
+          const list = await ghGetFile('data/photos');
+          if (Array.isArray(list)) {
+            const match = list.find(f => f.name === photoMeta.storedFileName);
+            if (match) sha = match.sha;
+          }
+        }
+        if (sha) {
+          const blobData = await ghGetBlob(sha);
+          if (blobData && blobData.content) {
+            const blob = base64ToBlob(blobData.content, photoMeta.mimeType || 'image/jpeg');
+            await idbSavePhoto({ ...photoMeta, blob }).catch(() => {});
             const objUrl = URL.createObjectURL(blob);
             blobUrlCache.set(photoMeta.id, objUrl);
             return objUrl;
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        console.warn('Foto aus GitHub laden fehlgeschlagen:', e);
+      }
     }
     return `data/photos/${encodeURIComponent(photoMeta.storedFileName)}`;
   }
@@ -1448,24 +1487,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const cfg = { repo, branch, token };
-      const prevMode = state.storageMode;
       const existing = await ghGetFile('data/notenbuch.json', cfg);
+      const parsedRemote = existing && existing.content
+        ? JSON.parse(base64ToUtf8(existing.content))
+        : null;
+
+      // Check if local server (/api/state) has grades we should migrate
+      let localServerData = null;
+      if (!window.location.hostname.endsWith('.github.io')) {
+        try {
+          const locRes = await fetch('/api/state', { cache: 'no-store' });
+          if (locRes.ok) localServerData = await locRes.json();
+        } catch (_) {}
+      }
+
+      const remoteGradesCount = parsedRemote && Array.isArray(parsedRemote.grades) ? parsedRemote.grades.length : 0;
+      const localGradesCount = localServerData && Array.isArray(localServerData.grades)
+        ? localServerData.grades.length
+        : state.grades.length;
+
       saveGhConfig(cfg);
       state.storageMode = 'github';
 
-      if (existing && existing.content) {
-        const parsed = JSON.parse(base64ToUtf8(existing.content));
-        state.subjects = normalizeSubjects(parsed.subjects);
-        state.grades = parsed.grades || [];
-      } else {
-        // Upload existing local photos (from local server or IndexedDB) into the private GitHub repo
+      if (remoteGradesCount > 0 && localGradesCount === 0) {
+        state.subjects = normalizeSubjects(parsedRemote.subjects);
+        state.grades = parsedRemote.grades || [];
+      } else if (localGradesCount > 0 && remoteGradesCount === 0) {
+        // Upload local grades & photos into the private GitHub repository
+        if (localServerData) {
+          state.subjects = normalizeSubjects(localServerData.subjects);
+          state.grades = localServerData.grades || [];
+        }
+        saveBtn.textContent = 'Lade lokale Fotos hoch...';
         for (const grade of state.grades) {
           for (const pMeta of grade.photos || []) {
             try {
               let blob = null;
-              if (prevMode === 'server') {
-                const r = await fetch(`/api/photos/${encodeURIComponent(pMeta.id)}`);
-                if (r.ok) blob = await r.blob();
+              const r = await fetch(`/api/photos/${encodeURIComponent(pMeta.id)}`).catch(() => null);
+              if (r && r.ok) {
+                blob = await r.blob();
               } else {
                 const rec = await idbGetPhoto(pMeta.id);
                 if (rec && rec.blob) blob = rec.blob;
@@ -1476,16 +1536,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const storedFileName = pMeta.storedFileName || `${pMeta.id}${ext}`;
                 pMeta.storedFileName = storedFileName;
                 const b64 = arrayBufferToBase64(await blob.arrayBuffer());
-                await ghPutFile(
+                const putRes = await ghPutFile(
                   `data/photos/${storedFileName}`,
                   b64,
                   `Foto synchronisiert: ${pMeta.name || storedFileName}`,
                   cfg
                 );
+                if (putRes && putRes.content && putRes.content.sha) {
+                  pMeta.sha = putRes.content.sha;
+                }
               }
-            } catch (_) {}
+            } catch (e) {
+              console.warn('Foto-Sync Fehler:', e);
+            }
           }
         }
+        saveBtn.textContent = 'Speichere Noten...';
+        await persistState();
+      } else if (parsedRemote) {
+        state.subjects = normalizeSubjects(parsedRemote.subjects);
+        state.grades = parsedRemote.grades || [];
+      } else {
         await persistState();
       }
 
